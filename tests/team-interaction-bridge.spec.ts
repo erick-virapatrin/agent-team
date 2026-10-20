@@ -20,8 +20,8 @@ describe('TeamInteractionBridge', () => {
       agent: { id: 'session-1' },
       questions: [{
         id: 'language',
-        question: '选择语言？',
-        options: [{ label: 'TypeScript', description: '推荐' }, { label: 'Rust' }],
+        question: 'Which language?',
+        options: [{ label: 'TypeScript', description: 'Recommended' }, { label: 'Rust' }],
       }],
     })
 
@@ -29,7 +29,7 @@ describe('TeamInteractionBridge', () => {
       kind: 'question',
       questions: [expect.objectContaining({
         id: 'language',
-        options: [{ label: 'TypeScript', description: '推荐' }, { label: 'Rust' }],
+        options: [{ label: 'TypeScript', description: 'Recommended' }, { label: 'Rust' }],
       })],
     })])
     expect(onChange).toHaveBeenCalledWith('session-1')
@@ -58,7 +58,7 @@ describe('TeamInteractionBridge', () => {
     const next = vi.fn(async () => ({ answers: [{ id: 'language', selected: ['Rust'] }] }))
     const pending = events.ask('user-questions/request', {
       agent: { id: 'other-session' },
-      questions: [{ id: 'language', question: '选择语言？' }],
+      questions: [{ id: 'language', question: 'Which language?' }],
     }, next)
 
     await expect(pending).resolves.toEqual({ answers: [{ id: 'language', selected: ['Rust'] }] })
@@ -78,14 +78,14 @@ describe('TeamInteractionBridge', () => {
       agent: { id: 'session-2' },
       toolName: 'bash',
       callId: 'call-1',
-      reason: '需要访问工作区之外的路径',
+      reason: 'Needs access to paths outside the workspace',
     })
 
     expect(bridge.list('session-2')).toEqual([expect.objectContaining({
       kind: 'approval',
       toolName: 'bash',
       callId: 'call-1',
-      reason: '需要访问工作区之外的路径',
+      reason: 'Needs access to paths outside the workspace',
       approvalId: expect.any(String),
     })])
 
@@ -154,14 +154,14 @@ describe('normalizeQuestionAnswers', () => {
   it('rejects incomplete and forged option answers', () => {
     const questions = [{
       id: 'model',
-      question: '选择模型？',
+      question: 'Which model?',
       options: [{ label: 'DeepSeek' }, { label: 'GLM' }],
     }]
     expect(() => normalizeQuestionAnswers(questions, [])).toThrow(AgentTeamError)
     expect(() => normalizeQuestionAnswers(questions, [{
       id: 'model',
       selected: ['Unknown'],
-    }])).toThrow('包含无效选项')
+    }])).toThrow('contains invalid options')
   })
 })
 

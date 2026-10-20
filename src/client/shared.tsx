@@ -12,8 +12,8 @@ const DIALOG_EXIT_MS = 140
  * streaming render cache when the label object identity changes.
  */
 export const MARKDOWN_LABELS: MarkdownLabels = {
-  code: { copyLabel: '复制', copiedLabel: '已复制' },
-  footnotes: '脚注',
+  code: { copyLabel: 'Copy', copiedLabel: 'Copied' },
+  footnotes: 'Footnotes',
 }
 
 export function AnimatedModal(props: ComponentProps<typeof Modal>): JSX.Element | null {

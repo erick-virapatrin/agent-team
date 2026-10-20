@@ -107,10 +107,10 @@ export interface McpCatalogSnapshot {
 }
 
 const PERMISSION_PRESET_LABELS: Readonly<Record<string, string>> = {
-  'read-only': '只读',
-  'workspace-write': '工作区可写',
-  'danger-full-access': '完全访问',
-  standard: '标准',
+  'read-only': 'Read-only',
+  'workspace-write': 'Workspace writable',
+  'danger-full-access': 'Full access',
+  standard: 'Standard',
 }
 
 export class AgentTeamService extends Service {
@@ -797,7 +797,7 @@ export class AgentTeamService extends Service {
     if (capability === undefined || capability.kind !== 'native') {
       throw new AgentTeamError(
         'INVALID_REQUEST',
-        '当前 Harness 宿主未提供本机目录选择器，请手动输入工作目录',
+        'This Harness host does not provide a native directory picker; enter the working directory manually',
       )
     }
     const path = await capability.pick(new AbortController().signal)

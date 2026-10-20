@@ -1,78 +1,78 @@
-# 创建团队
+# Creating Teams
 
-[上一篇：助手库](./assistants.md) · [文档首页](./README.md) · [下一篇：工作台与协作](./workbench.md)
+[Previous: Assistant Library](./assistants.md) · [Documentation Home](./README.md) · [Next: Workbench and Collaboration](./workbench.md)
 
-创建团队前，至少准备一个适合担任 Leader 的助手和一个普通成员助手。
+Before you create a team, prepare at least one assistant suited to being the Leader and one regular member assistant.
 
-## 打开新建团队
+## Open the New Team Form
 
-点击页面左侧的悬浮 **团队** 按钮进入 Agent Team 工作台，再从团队列表顶部点击 `+`。
+Click the floating **Team** button on the left side of the page to enter the Agent Team Workbench, then click `+` at the top of the team list.
 
-## 选择成员
+## Select Members
 
-![新建团队](../demo/3.png)
+![New team](../demo/3.png)
 
-左侧是助手库，右侧是已选成员：
+The assistant library is on the left and the selected members are on the right:
 
-1. 点击助手右侧 `+` 添加成员。
-2. 同一个助手可以重复添加，每次都会创建独立成员实例。
-3. 在右侧选择一个成员作为 Leader。
-4. 点击成员右侧 `×` 可以在创建前移除。
+1. Click `+` on the right side of an assistant to add a member.
+2. You can add the same assistant repeatedly; each addition creates an independent member instance.
+3. Select one member on the right as the Leader.
+4. Click `×` on the right side of a member to remove it before creating the team.
 
-团队必须有且只有一个 Leader，但成员总数没有固定上限。成员较多时，工作台会保持每列可用宽度，并允许横向滚动。
+A team must have exactly one Leader, but there is no fixed upper limit on the total number of members. With many members, the Workbench keeps each column at a usable width and allows horizontal scrolling.
 
-## 填写团队信息
+## Fill in Team Information
 
-### 团队名称
+### Team Name
 
-使用能表达目标的名称，例如“移动端发布团队”“文档迁移团队”或“DSH 插件开发团队”。名称会显示在左侧团队列表中。
+Use a name that expresses the goal, for example "Mobile Release Team", "Documentation Migration Team", or "DSH Plugin Development Team". The name is shown in the team list on the left.
 
 ### Workspace
 
-选择所有成员共享的工作目录：
+Choose the working directory shared by all members:
 
-- 可以选择 Harness 中已有 Workspace。
-- 也可以点击 **选择文件夹**，通过 Harness 的目录选择器添加目录。
+- You can pick an existing Workspace in Harness.
+- You can also click **Select Folder** to add a directory through the Harness directory picker.
 
-成员会在该 Workspace 中读取和修改文件，因此创建前应确认目录正确。
+Members read and modify files in this Workspace, so confirm the directory is correct before creating the team.
 
-### 允许直接通信
+### Allow Direct Communication
 
-勾选 **允许用户和普通成员直接通信** 后，用户可以绕过 Leader，直接向普通成员发送消息。关闭时，普通成员主要接收 Leader 分派的任务和团队消息。
+When **Allow the user to chat directly with regular members** is checked, the user can bypass the Leader and send messages straight to a regular member. When it is off, regular members mainly receive tasks assigned by the Leader and team messages.
 
-## 创建并自动启动
+## Create and Auto-Start
 
-点击 **创建并启动** 后，插件会：
+After you click **Create and start**, the plugin:
 
-1. 为每个已选成员创建独立 Session。
-2. 把所有 Session 关联到同一个 Workspace。
-3. 注入团队角色、成员列表和协作工具。
-4. 自动打开全屏团队工作台。
+1. Creates an independent Session for each selected member.
+2. Associates all Sessions with the same Workspace.
+3. Injects the team roles, the member list, and the collaboration tools.
+4. Opens the full-screen team Workbench automatically.
 
-没有额外的“启动团队”步骤，也没有“待启动”状态。只有成员实际执行消息或任务时，团队才会显示任务执行状态。
+There is no extra "start team" step and no "pending start" state. The team shows task execution status only when a member is actually executing a message or task.
 
-## 团队搭配建议
+## Team Composition Suggestions
 
-### 软件开发
+### Software Development
 
-- Leader：需求理解、任务拆解、验收。
-- Coder：实现功能和修复问题。
-- Reviewer：代码审查和风险检查。
-- Tester：执行测试和回归验证。
+- Leader: requirement understanding, task breakdown, acceptance.
+- Coder: implement features and fix issues.
+- Reviewer: code review and risk checks.
+- Tester: run tests and regression verification.
 
-### 内容与文档
+### Content and Documentation
 
-- Leader：规划结构、分派章节、统一风格。
-- Researcher：收集和核对资料。
-- Writer：撰写正文。
-- Reviewer：事实核查、润色和格式检查。
+- Leader: plan the structure, assign sections, keep the style consistent.
+- Researcher: collect and verify source material.
+- Writer: write the body text.
+- Reviewer: fact-check, polish, and check formatting.
 
-模型不必相同。可以让擅长规划的模型担任 Leader，让更适合编码或成本更低的模型担任执行成员。
+The models do not have to be the same. You can make a model that is strong at planning the Leader, and use a model that is better suited to coding, or cheaper, as an executing member.
 
-### 混合模型开发团队示例
+### Mixed-Model Development Team Example
 
-- **GPT Leader**：理解需求、制定方案、拆解任务、协调进度和验收结果。
-- **GLM Coder**：接收编码任务，修改 Workspace，运行测试并回报产出。
-- **DeepSeek Flash Commit 助手**：在验收完成后只读分析 Git Diff，快速生成 Conventional Commit 信息。
+- **GPT Leader**: understands requirements, defines the plan, breaks down tasks, coordinates progress, and accepts results.
+- **GLM Coder**: receives coding tasks, modifies the Workspace, runs tests, and reports output.
+- **DeepSeek Flash Commit Assistant**: after acceptance, analyses the Git diff read-only and quickly generates a Conventional Commit message.
 
-三个成员分别拥有独立 Session。GLM 的代码阅读和工具输出不会塞入 GPT Leader 的上下文，Commit 助手也不需要继承 Leader 的高等级模型、编码 Skills 或写入权限。
+Each of the three members has its own Session. GLM's code reading and tool output do not get packed into the GPT Leader's context, and the Commit Assistant does not need to inherit the Leader's high-tier model, coding Skills, or write permissions.

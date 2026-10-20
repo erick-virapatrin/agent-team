@@ -29,22 +29,22 @@ const ASSISTANT_BUILDER_SESSION_PREFIX = `${ASSISTANT_BUILDER_SESSION_ID}:`
 const ASSISTANT_BUILDER_DRAFT_ID = `${ASSISTANT_BUILDER_SESSION_PREFIX}draft`
 
 export const ASSISTANT_BUILDER_PROMPT = `
-你是“团队 Agent 小助手”，负责通过对话帮助用户创建可复用的 Agent 助手模板。
+You are the "Team Agent Assistant", responsible for helping users create reusable Agent assistant templates through conversation.
 
-工作规则：
-1. 先理解用户希望这个助手承担的职责、工作边界、输出方式和协作习惯。
-2. 创建前必须收集名称、Provider、模型、Agent Preset、权限预设和长期提示词。说明按需要收集；可用 Skills 和 MCP Servers 由用户从真实目录中选择，都可以不选。
-3. 必须先调用 assistant_builder_get_catalog 获取当前真实可选项；Provider、模型、Preset 和权限只能使用目录中存在的标识，不能编造。确定模型后，再携带 provider 和 model 调用一次目录工具读取该模型真实支持的思考模式；未返回思考能力时不得配置。确定 Agent Preset 后，再携带 agentPresetId 调用一次目录工具，取得该 Preset 可用的 Skills 和 MCP Servers。
-4. 参数不完整或意图含糊时，优先调用 ask_user_question，一次询问一至三个最关键的问题，并给出基于真实目录的简短选项和建议。问题较开放、需要用户详细描述，或只是普通解释时，可以直接输出中文文本。
-5. 长期提示词应描述稳定职责、约束、工作流程和验收要求，不要写入用户眼前的一次性任务。
-6. 只保存用户明确选择的 Skills 和 MCP Servers；未选择就表示不使用，不能猜测名称。不要询问或限制普通工具，工具能力由 Agent Preset 提供。
-7. 配置完整后调用 assistant_builder_prepare 校验并暂存草稿；此步骤不会创建助手，新草稿会替代旧草稿。
-8. 用简洁清单复述最终配置，并询问用户是否确认创建。用户可以用自然语言表达同意，例如“确认”“可以”“就这样创建”“没问题，创建吧”，不要要求固定口令。必须等待新的用户消息，不得在同一轮代替用户确认。
-9. 只有用户对当前最终配置明确表达同意后才能调用 assistant_builder_commit。若用户的回复含糊、否定创建、提出问题或要求修改配置，不得提交；应先回答或修改草稿，再次展示最终配置并征求确认。
-10. 创建成功后明确告知助手名称，并提示它现在可以加入团队。
-11. 你只能帮助设计和创建助手模板，不创建团队、不修改或删除已有助手，也不执行 Workspace 任务。
+Working rules:
+1. First understand the responsibilities, scope and boundaries, output style, and working conventions the user wants this assistant to take on.
+2. Before creating, you must collect the name, Provider, model, Agent Preset, permission preset, and standing prompt. Collect the description as needed; the available Skills and MCP Servers are chosen by the user from the real catalog, and both may be left unselected.
+3. You must first call assistant_builder_get_catalog to obtain the current real options; Provider, model, Preset and permission may only use identifiers that exist in the catalog, never fabricate them. After the model is chosen, call the catalog tool once more with provider and model to read the reasoning modes the model really supports; when no reasoning capability is returned, it must not be configured. After the Agent Preset is chosen, call the catalog tool once more with agentPresetId to obtain the Skills and MCP Servers available to that Preset.
+4. When parameters are incomplete or the intent is ambiguous, prefer calling ask_user_question, asking one to three of the most critical questions at a time, and give brief options and suggestions based on the real catalog. When a question is open-ended, needs the user to describe details, or is just a normal explanation, you may output text directly in the user's language.
+5. The standing prompt should describe stable responsibilities, constraints, workflow, and acceptance criteria; do not write in the one-off task currently in front of the user.
+6. Only save the Skills and MCP Servers the user explicitly selected; not selected means not used, and names must not be guessed. Do not ask about or restrict ordinary tools; tool capabilities are provided by the Agent Preset.
+7. Once the configuration is complete, call assistant_builder_prepare to validate and stage the draft; this step does not create the assistant, and a new draft replaces the older one.
+8. Restate the final configuration in a concise list, and ask the user whether they confirm creating it. The user may express agreement in natural language, for example "confirm", "OK", "create it like this", "no problem, go ahead and create it"; do not require a fixed phrase. You must wait for a new user message, and must not confirm on the user's behalf in the same turn.
+9. Only call assistant_builder_commit after the user has clearly expressed agreement with the current final configuration. If the user's reply is ambiguous, denies creating, raises a question, or asks to change the configuration, do not commit; first answer or modify the draft, show the final configuration again, and ask for confirmation.
+10. After a successful creation, explicitly state the assistant name, and note that it can now join a team.
+11. You may only help design and create assistant templates; do not create teams, do not modify or delete existing assistants, and do not perform Workspace tasks.
 
-保持中文、简洁、主动，但不要替用户猜测会显著影响成本、权限或能力范围的参数。
+Reply in the user's language, be concise and proactive, but do not guess on the user's behalf parameters that would significantly affect cost, permissions, or capability scope.
 `.trim()
 
 interface AssistantBuilderConfiguration {
@@ -236,7 +236,7 @@ export class AssistantBuilderRuntime {
     const sessionId = await this.requireExistingSessionId(rawSessionId)
     await this.ensureOnline(sessionId)
     if (this.activeSessionId !== sessionId) {
-      throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求不属于当前团队 Agent 小助手会话')
+      throw new AgentTeamError('INTERACTION_NOT_FOUND', 'This interaction request does not belong to the current Team Agent Assistant session')
     }
     await this.interactions.respond(sessionId, interactionId, response)
   }
@@ -253,7 +253,7 @@ export class AssistantBuilderRuntime {
     if (this.isConversationArchived(sessionId)) return
     const current = sessionId === this.activeSessionId ? this.handle : undefined
     if (current?.agent.status === 'running') {
-      throw new AgentTeamError('INVALID_REQUEST', '请先停止团队 Agent 小助手当前回复，再归档会话')
+      throw new AgentTeamError('INVALID_REQUEST', 'Stop the current Team Agent Assistant reply before archiving the session')
     }
     await this.ctx.workspaceRegistry.archiveSession(SessionId(sessionId))
     if (current !== undefined) {
@@ -311,7 +311,7 @@ export class AssistantBuilderRuntime {
       this.ctx.logger.warn(`agent-team: assistant builder activation failed: ${message}`, error)
       throw new AgentTeamError(
         'SESSION_CREATE_FAILED',
-        `团队 Agent 小助手启动失败：${message}`,
+        `Failed to start the Team Agent Assistant: ${message}`,
         { cause: message },
         { cause: error },
       )
@@ -337,7 +337,7 @@ export class AssistantBuilderRuntime {
     await this.starting?.catch(() => undefined)
     const current = this.handle
     if (current?.agent.status === 'running') {
-      throw new AgentTeamError('INVALID_REQUEST', '请先停止当前小助手回复，再切换会话')
+      throw new AgentTeamError('INVALID_REQUEST', 'Stop the current assistant reply before switching sessions')
     }
     if (current !== undefined) {
       await this.ctx.sessions.flush(current.agent.session)
@@ -356,7 +356,7 @@ export class AssistantBuilderRuntime {
     if (current !== undefined && current.agent.status === 'running') {
       throw new AgentTeamError(
         'INVALID_REQUEST',
-        '请先停止团队 Agent 小助手当前回复，再切换模型',
+        'Stop the current Team Agent Assistant reply before switching models',
       )
     }
     if (
@@ -665,7 +665,7 @@ export class AssistantBuilderRuntime {
         schema: { type: 'object', additionalProperties: true },
         render: (_args, value) => [{
           type: 'text',
-          text: `草稿“${value.name}”已校验。请展示最终配置，并等待用户在新的消息中明确同意创建；用户可使用自然语言表达，无需固定口令。`,
+          text: `Draft "${value.name}" has been validated. Present the final configuration, and wait for the user to explicitly agree to the creation in a new message; the user may express it in natural language, no fixed phrase is required.`,
         }],
       },
       execute: async (args, exec) => {
@@ -709,7 +709,7 @@ export class AssistantBuilderRuntime {
           },
           additionalProperties: false,
         },
-        render: (_args, value) => [{ type: 'text', text: `助手“${value.name}”已创建。` }],
+        render: (_args, value) => [{ type: 'text', text: `Assistant "${value.name}" has been created.` }],
       },
       execute: async (_args, exec) => {
         this.assertToolIdentity(exec.agent?.id, sessionId)
@@ -720,7 +720,7 @@ export class AssistantBuilderRuntime {
         if (pending === undefined) {
           throw new AgentTeamError(
             'INVALID_REQUEST',
-            '没有等待确认的助手草稿，请先重新校验草稿',
+            'No assistant draft is awaiting confirmation; validate the draft again first',
           )
         }
         if (!hasFreshAssistantDraftUserResponse(
@@ -729,7 +729,7 @@ export class AssistantBuilderRuntime {
         )) {
           throw new AgentTeamError(
             'INVALID_REQUEST',
-            '必须等待用户在新的消息中明确同意当前助手配置',
+            'You must wait for the user to explicitly agree to the current assistant configuration in a new message',
           )
         }
         const assistant = await this.service.createAssistant(pending.input)
@@ -808,7 +808,7 @@ function summarizeConversation(
   const lastEventAt = events.at(-1)?.time ?? createdAt
   return {
     sessionId,
-    title: firstUser?.kind === 'user' ? conversationTitle(firstUser.text) : '新对话',
+    title: firstUser?.kind === 'user' ? conversationTitle(firstUser.text) : 'New conversation',
     createdAt: new Date(createdAt).toISOString(),
     updatedAt: new Date(lastEventAt).toISOString(),
     state: lastUserSeq < 0

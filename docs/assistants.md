@@ -1,88 +1,88 @@
-# 助手库
+# Assistant Library
 
-[上一篇：安装与启动](./installation.md) · [文档首页](./README.md) · [下一篇：创建团队](./creating-teams.md)
+[Previous: Installation and Startup](./installation.md) · [Documentation Home](./README.md) · [Next: Creating Teams](./creating-teams.md)
 
-助手是可以在多个团队之间复用的角色模板。解散团队不会删除助手；删除助手也不会直接删除已生成的 Harness Session。
+An assistant is a role template you can reuse across teams. Disbanding a team does not delete assistants, and deleting an assistant does not delete the Harness Sessions it already produced.
 
-## 打开助手库
+## Opening the assistant library
 
-进入 **设置 → Agent 团队**。
+Go to **Settings → Agent Team**.
 
-![助手库](../demo/2.png)
+![Assistant library](../demo/2.png)
 
-每张助手卡片会展示模型、Preset、默认权限、思考模式、Skills、MCP Servers 和角色说明。可用操作包括：
+Each assistant card shows the model, Preset, default permission, reasoning mode, Skills, MCP Servers and the role description. The available actions are:
 
-- **编辑**：修改模板配置。
-- **复制**：以当前配置创建新的助手。
-- **删除**：删除未被团队成员引用的助手。
+- **Edit**: change the template configuration.
+- **Copy**: create a new assistant from the current configuration.
+- **Delete**: delete an assistant that no team member references.
 
-## 创建方式一：团队 Agent 小助手
+## Method 1: the built-in assistant builder
 
-点击内置卡片中的 **开始对话**，用自然语言描述需要的角色，例如：
+Click **Start chat** on the built-in card and describe the role you need in natural language, for example:
 
 ```text
-帮我创建一个负责 React 前端开发和代码审查的助手，使用 GLM 模型，默认工作区可写。
+Create an assistant in charge of React front-end development and code review, using a GLM model, writable in the workspace by default.
 ```
 
-小助手会逐项补充缺失配置，并生成完整方案。只有在你明确确认后，才会真正创建助手。
+The builder fills in the missing configuration item by item and produces a complete plan. The assistant is only created for real after you confirm explicitly.
 
-![通过对话创建助手](../demo/1.png)
+![Creating an assistant through a conversation](../demo/1.png)
 
-小助手支持多段独立历史记录。未发送首条消息的新对话不会创建真实 Session，也不会出现在历史中。
+The builder keeps several independent conversation histories. A new conversation where the first message has not been sent does not create a real Session and does not appear in the history.
 
-## 创建方式二：手动新建
+## Method 2: manual creation
 
-点击助手库右上角 **手动新建**，直接配置所有字段。
+Click **New manually** in the top-right of the assistant library and configure every field directly.
 
-| 字段 | 作用 |
+| Field | Purpose |
 | --- | --- |
-| 名称 | 助手在助手库、团队成员和对话标题中的名称 |
-| 说明 | 简短描述助手用途，便于组建团队时选择 |
-| Provider / 模型 | 该助手默认使用的模型来源和模型 |
-| Agent Preset | 决定基础提示、可用工具和运行方式 |
-| 默认权限 | 成员首次启动时使用的权限，可在工作台修改 |
-| 思考模式 | 模型支持时，从 Harness 能力目录中选择强度 |
-| Skills | 允许模型按需加载或由用户通过 `/` 调用的技能 |
-| MCP Servers | 允许使用的已配置 MCP Server |
-| 助手规则 | 长期角色、职责、约束和汇报方式 |
+| Name | The assistant's name in the assistant library, in team members and in conversation titles |
+| Description | A short description of what the assistant is for, to make it easy to pick when forming a team |
+| Provider / Model | The model source and model this assistant uses by default |
+| Agent Preset | Decides the base prompt, the available tools and how it runs |
+| Default permission | The permission the member uses when it starts; you can change it in the Workbench |
+| Reasoning mode | The strength picked from the Harness capability catalog, when the model supports it |
+| Skills | Skills the model may load on demand, or that the user can invoke with `/` |
+| MCP Servers | Configured MCP servers the assistant is allowed to use |
+| Assistant rules | The standing role, responsibilities, constraints and reporting style |
 
-## 如何写助手规则
+## How to write assistant rules
 
-规则应明确职责、边界和交付方式。例如 Leader：
-
-```text
-你负责理解用户目标、拆解任务、分派给合适成员并验收结果。
-编码任务优先交给成员执行；任务失败时先收集原因，再决定重试或重新分派。
-完成后向用户汇总产出、验证结果和遗留风险。
-```
-
-普通编码成员可以写：
+Rules should state the responsibilities, the boundaries and the way work is delivered. For a Leader:
 
 ```text
-你负责执行 Leader 分派的编码任务。
-修改前先阅读相关文件并遵循现有代码风格。
-完成后运行必要测试，通过团队任务工具回报结果和文件清单。
+You are in charge of understanding the user's goal, breaking it into tasks, assigning them to the right members and accepting the results.
+Hand coding work to members to execute; when a task fails, collect the causes first, then decide whether to retry or reassign.
+When the work is done, summarize the output, the verification results and any remaining risk for the user.
 ```
 
-## 权限与思考模式
+A regular coding member can be written as:
 
-- 模板权限只作为成员首次启动的默认值，进入工作台后可以为每个 Session 单独切换。
-- 思考模式选项由 Harness 的模型能力决定。不同模型可能支持不同档位，也可能只支持模型默认。
-- 工作台中更改思考模式后，从下一轮消息开始生效。
+```text
+You carry out the coding tasks the Leader assigns.
+Before changing anything, read the relevant files and follow the existing code style.
+When you finish, run the necessary tests and report the result and the list of files through the team task tool.
+```
 
-## Skills 与 MCP
+## Permission and reasoning mode
 
-- Skills 来自所选 Agent Preset 的可用目录，助手只保存允许使用的名称；仅支持用户调用的 Skill 会标记为“仅斜杠调用”。
-- MCP 连接和凭据由 Harness Profile 管理，助手只保存允许使用的 Server 名称。
-- 如果列表为空，先检查 Harness Profile 和 Agent Preset 的配置。
+- The template permission is only the default for a member's first start. Once you are in the Workbench you can switch it for each Session separately.
+- The reasoning-mode options are decided by Harness's model capabilities. Different models may support different levels, and some may support only the model default.
+- Changing the reasoning mode in the Workbench takes effect from the next message on.
 
-## 编辑为何不会立即影响团队成员
+## Skills and MCP
 
-助手加入团队时会生成不可变配置快照，保证运行中的成员不会因为模板编辑突然改变模型或规则。因此：
+- Skills come from the catalog available to the selected Agent Preset, and the assistant stores only the names it is allowed to use; a Skill that only supports user invocation is marked "Slash command only".
+- MCP connections and credentials are managed by the Harness Profile, and the assistant stores only the server names it is allowed to use.
+- If the list is empty, check the Harness Profile and Agent Preset configuration first.
 
-- 编辑只影响以后新加入团队的成员。
-- 已运行成员要应用新配置，需要先移出，再重新添加该助手。
+## Why editing does not affect team members right away
 
-## 删除助手
+When an assistant joins a team it produces an immutable configuration snapshot, so a running member never changes model or rules suddenly because the template was edited. Therefore:
 
-如果助手仍被任何团队成员引用，系统会拒绝删除。先从相关团队移出对应成员，或解散相关团队，再返回助手库删除。
+- Edits only affect members that join the team afterwards.
+- To apply a new configuration to a member that is already running, remove it first, then add that assistant again.
+
+## Deleting an assistant
+
+If the assistant is still referenced by any team member, the delete is rejected. Remove the matching member from the relevant teams, or disband those teams, then go back to the assistant library and delete.

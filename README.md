@@ -68,7 +68,7 @@ User goal → GPT Leader plans and assigns work
 - Change a member's permission preset and reasoning mode for the current session.
 - Inspect loaded Skills, context usage, token statistics, and cache hit rate.
 - Browse shared Workspace files and preview Git changes and diffs.
-- Add or remove members, change the Leader, reset all contexts, or dissolve a team.
+- Add or remove members, change the Leader, reset all contexts, or disband a team.
 
 ## Screenshots
 
@@ -80,7 +80,7 @@ Describe the role you need. The built-in assistant collects missing settings, pr
 
 ### Reusable Assistant Library
 
-Manage assistants under **Settings → Agent Team**. Each assistant can use a different provider, model, preset, default permission, reasoning mode, Skills, MCP Servers, and role instructions.
+Manage assistants under **Settings → Agent Team**. Each assistant can use a different provider, model, preset, default permission, reasoning mode, Skills, MCP Servers, and Assistant rules.
 
 > **Skills and MCP scope:** Agent Team uses Skills and MCP Servers exposed through the standard DeepSeek Harness interfaces. This plugin does not provide installation, updates, or lifecycle management for Skills or MCP Servers. Install the appropriate Harness plugins to manage those resources first; Agent Team only lets an assistant select and use the resources already available in the active Profile.
 
@@ -154,7 +154,7 @@ Restart Harness after the command completes. Removing the plugin does not modify
 
 Configure the providers, models, and credentials you want to use in Harness first. Agent Team reads the model catalog from the active Profile and never stores provider API keys.
 
-> **Tip: enable Thinking Mode for GLM-5.3**
+> **Tip: enable Reasoning mode for GLM-5.3**
 >
 > Add the following configuration to `~/.dsh/settings.yaml`. It exposes the available reasoning levels for GLM-5.3 and sets `high` as the Provider default:
 >
@@ -178,14 +178,14 @@ Configure the providers, models, and credentials you want to use in Harness firs
 >             supportsReasoningEffort: true
 > ```
 >
-> Merge this block into an existing `llm-pi-ai` section instead of adding a second one. If your ZAI Provider uses a different ID, replace `zai-coding-cn`. Restart Harness, then select the desired **Thinking Mode** from the assistant conversation toolbar; that runtime selection overrides the Provider default for the conversation.
+> Merge this block into an existing `llm-pi-ai` section instead of adding a second one. If your ZAI Provider uses a different ID, replace `zai-coding-cn`. Restart Harness, then select the desired **Reasoning mode** from the assistant conversation toolbar; that runtime selection overrides the Provider default for the conversation.
 
 ### 2. Create Assistants
 
 Open **Settings → Agent Team** and choose one of the following:
 
-- **Start Conversation** to design an assistant through chat.
-- **Create Manually** to configure all fields directly.
+- **Start chat** to design an assistant through chat.
+- **New manually** to configure all fields directly.
 
 A practical first team usually contains:
 
@@ -215,7 +215,7 @@ Each visible column is a real, independent Harness session.
 - **Member tabs:** show or hide conversations. Hover a non-Leader tab to remove that member.
 - **Conversation header:** shows role, provider, model, reasoning mode, and live status. Double-click it to enlarge the conversation.
 - **Composer:** send messages; type `/` to invoke an allowed Skill; type `@` to search and mention Workspace files; attach local files, stop generation, and change runtime settings.
-- **Permission:** applies to the selected member's current session. The assistant template only supplies the initial default.
+- **Permissions:** applies to the selected member's current session. The assistant template only supplies the initial default.
 - **Reasoning mode:** applies from the next turn and only shows options supported by the selected model.
 - **Info:** displays the Skills loaded for the member.
 - **Context ring:** displays context usage, input/output tokens, and cache hit rate.
@@ -240,7 +240,7 @@ Members share a Workspace, but they do not share conversation history. This keep
 - **Remove member:** stops and archives that member's session, removes it from the team, and notifies the Leader.
 - **Change Leader:** changes the role without replacing the member's current session.
 - **Clear tasks and context:** stops all members, clears team tasks and queued messages, and gives every remaining member a new session. Team settings and Workspace files stay unchanged.
-- **Dissolve team:** permanently removes the team, its tasks, and team messages. Assistant templates and Workspace files are not deleted.
+- **Disband team:** permanently removes the team, its tasks, and team messages. Assistant templates and Workspace files are not deleted.
 
 Assistant settings are snapshotted when a member joins a team. Editing an assistant later does not hot-update existing members; remove and add the member again to apply the new configuration.
 
@@ -251,7 +251,7 @@ Assistant settings are snapshotted when a member joins a team. Editing an assist
 - MCP credentials remain in the Harness Profile. Assistant templates only store allowed server names.
 - Files selected from outside the Workspace are copied to `.agent-team/uploads/` so agents can access them reliably.
 - The **Changes** view requires a Git Workspace. Normal folders still support file browsing.
-- Harness currently has no public API for physically deleting one session log. Reset or dissolved sessions are no longer restored or used by Agent Team, but old logs may remain in Harness storage.
+- Harness currently has no public API for physically deleting one session log. Reset or disbanded sessions are no longer restored or used by Agent Team, but old logs may remain in Harness storage.
 
 ## Troubleshooting
 
@@ -269,7 +269,7 @@ Refresh the assistant catalog and verify the model configuration in Harness. Rea
 
 ### An assistant cannot be deleted
 
-The assistant is still referenced by a team member. Remove those members or dissolve the related teams first.
+The assistant is still referenced by a team member. Remove those members or disband the related teams first.
 
 ### No Git changes are displayed
 
