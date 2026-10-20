@@ -797,7 +797,7 @@ export class AgentTeamService extends Service {
     if (capability === undefined || capability.kind !== 'native') {
       throw new AgentTeamError(
         'INVALID_REQUEST',
-        '当前 Harness 宿主未提供本机目录选择器，请手动输入工作目录',
+        'This Harness host does not provide a native directory picker; enter the working directory manually',
       )
     }
     const path = await capability.pick(new AbortController().signal)

@@ -98,19 +98,19 @@ export class TeamInteractionBridge {
   ): Promise<void> {
     const record = this.records.get(interactionId)
     if (record === undefined) {
-      throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求已结束或不存在')
+      throw new AgentTeamError('INTERACTION_NOT_FOUND', 'This interaction request has ended or does not exist')
     }
     if (record.sessionId !== sessionId || !this.acceptsSession(sessionId)) {
-      throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求不属于指定的会话')
+      throw new AgentTeamError('INTERACTION_NOT_FOUND', 'This interaction request does not belong to the specified session')
     }
     if (record.kind === 'question') {
       if (response.kind !== 'question') {
-        throw new AgentTeamError('INTERACTION_INVALID', '交互响应类型与待处理请求不匹配')
+        throw new AgentTeamError('INTERACTION_INVALID', 'The interaction response type does not match the pending request')
       }
       record.resolve({ answers: normalizeQuestionAnswers(record.questions, response.answers) })
     } else {
       if (response.kind !== 'approval') {
-        throw new AgentTeamError('INTERACTION_INVALID', '交互响应类型与待处理请求不匹配')
+        throw new AgentTeamError('INTERACTION_INVALID', 'The interaction response type does not match the pending request')
       }
       record.resolve(response.outcome)
     }
@@ -224,32 +224,32 @@ export function normalizeQuestionAnswers(
   const byId = new Map<string, QuestionAnswerView>()
   for (const answer of answers) {
     if (byId.has(answer.id)) {
-      throw new AgentTeamError('INTERACTION_INVALID', `问题“${answer.id}”存在重复答案`)
+      throw new AgentTeamError('INTERACTION_INVALID', `Question "${answer.id}" has duplicate answers`)
     }
     byId.set(answer.id, answer)
   }
   if (byId.size !== questions.length) {
-    throw new AgentTeamError('INTERACTION_INVALID', '请完成全部问题后再提交')
+    throw new AgentTeamError('INTERACTION_INVALID', 'Answer every question before submitting')
   }
   return questions.map(question => {
     const answer = byId.get(question.id)
     if (answer === undefined) {
-      throw new AgentTeamError('INTERACTION_INVALID', `缺少问题“${question.id}”的答案`)
+      throw new AgentTeamError('INTERACTION_INVALID', `Question "${question.id}" is missing an answer`)
     }
     const selected = [...answer.selected]
     if (new Set(selected).size !== selected.length) {
-      throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”包含重复选项`)
+      throw new AgentTeamError('INTERACTION_INVALID', `Question "${question.id}" contains duplicate options`)
     }
     const allowed = new Set(question.options?.map(option => option.label) ?? [])
     if (selected.some(label => !allowed.has(label))) {
-      throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”包含无效选项`)
+      throw new AgentTeamError('INTERACTION_INVALID', `Question "${question.id}" contains invalid options`)
     }
     const custom = answer.custom?.trim()
     if (question.multiSelect !== true && selected.length > 0 && custom !== undefined && custom.length > 0) {
-      throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”的自定义答案不能与单选项同时提交`)
+      throw new AgentTeamError('INTERACTION_INVALID', `The custom answer for question "${question.id}" cannot be submitted together with an option`)
     }
     if (selected.length === 0 && (custom === undefined || custom.length === 0)) {
-      throw new AgentTeamError('INTERACTION_INVALID', `请回答问题“${question.question}”`)
+      throw new AgentTeamError('INTERACTION_INVALID', `Answer the question "${question.question}"`)
     }
     return {
       id: question.id,

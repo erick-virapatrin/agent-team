@@ -283,7 +283,7 @@ export function projectConversation(
           seq: event.seq,
           time: event.time,
           tone: 'warning',
-          text: '本轮输出已达到模型长度上限。',
+          text: 'This turn reached the model output length limit.',
         })
         break
       }
@@ -369,7 +369,7 @@ function teamMessageNode(
       seq,
       time,
       text: message.content,
-      senderName: '团队事件',
+      senderName: 'Team event',
       senderId: message.sender.id,
       senderRole: 'system',
       messageType: message.type,
@@ -385,7 +385,7 @@ function teamMessageNode(
     seq,
     time,
     text: message.content,
-    senderName: current?.displayName ?? retired?.displayName ?? '已移出成员',
+    senderName: current?.displayName ?? retired?.displayName ?? 'Removed member',
     senderId: message.sender.id,
     senderRole: message.sender.id === team.leaderSlotId ? 'leader' : 'member',
     messageType: message.type,
@@ -400,7 +400,7 @@ function isVisibleUserSource(source: MessageSource): boolean {
 function textOf(blocks: readonly ContentBlock[]): string {
   return blocks.flatMap(block => {
     if (block.type === 'text') return [block.text]
-    if (block.type === 'image') return ['[图片]']
+    if (block.type === 'image') return ['[image]']
     return []
   }).filter(Boolean).join('\n')
 }
