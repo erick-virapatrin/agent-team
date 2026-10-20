@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MARKDOWN_LABELS } from '../shared.js'
 import type {
   InteractionResponseInput,
   PendingInteractionView,
@@ -112,7 +113,7 @@ export function PendingInteractionCard({
                 <strong>{interaction.questions.length > 1 ? `${index + 1}. ${question.question}` : question.question}</strong>
               </legend>
               {question.detail && (
-                <div className={css.questionDetail}><MarkdownText text={question.detail} /></div>
+                <div className={css.questionDetail}><MarkdownText text={question.detail} labels={MARKDOWN_LABELS} /></div>
               )}
               {(question.options?.length ?? 0) > 0 && (
                 <div className={css.questionOptions}>

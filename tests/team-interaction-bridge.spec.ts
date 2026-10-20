@@ -1,7 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import { RpcId, type RpcRequest, type MuxFrame } from '@deepseek-ai/dsh-host-apiproxy'
-import { SessionId } from '@deepseek-ai/dsh-session'
 import { AgentTeamError } from '../src/domain/errors.js'
 import {
   normalizeQuestionAnswers,
@@ -9,95 +7,145 @@ import {
 } from '../src/runtime/team-interaction-bridge.js'
 
 describe('TeamInteractionBridge', () => {
-  it('projects and answers an official question request, then waits for resolved', async () => {
-    const resolved = deferred<void>()
-    const sessionId = SessionId('session-1')
-    const rpcId = RpcId('question-rpc-1')
-    const respond = vi.fn(async () => ({ accepted: true as const }))
+  it('claims a user-question request of an owned session and answers it', async () => {
+    const events = new FakeEvents()
     const onChange = vi.fn()
-    const bridge = new TeamInteractionBridge(contextWithMux([
-      {
-        rpcId,
-        payload: {
-          type: 'question/requested',
-          sessionId,
-          questions: [{
-            id: 'language',
-            question: '选择语言？',
-            options: [{ label: 'TypeScript', description: '推荐' }, { label: 'Rust' }],
-          }],
-        },
-      },
-      resolved.promise,
-      {
-        rpcId: RpcId('question-resolved-push'),
-        payload: {
-          type: 'question/resolved',
-          sessionId,
-          questionRpcId: rpcId,
-          outcome: 'answered',
-        },
-      },
-    ], respond), {
-      acceptsSession: id => id === String(sessionId),
+    const bridge = new TeamInteractionBridge(events.context, {
+      acceptsSession: id => id === 'session-1',
       onChange,
     })
-
     bridge.start()
-    await vi.waitFor(() => {
-      expect(bridge.list(String(sessionId))).toEqual([expect.objectContaining({
-        id: 'question:question-rpc-1',
-        kind: 'question',
-      })])
+    const next = vi.fn(async () => ({ answers: [] }))
+    const pending = events.ask('user-questions/request', {
+      agent: { id: 'session-1' },
+      questions: [{
+        id: 'language',
+        question: '选择语言？',
+        options: [{ label: 'TypeScript', description: '推荐' }, { label: 'Rust' }],
+      }],
     })
 
-    await bridge.respond(String(sessionId), 'question:question-rpc-1', {
+    expect(bridge.list('session-1')).toEqual([expect.objectContaining({
+      kind: 'question',
+      questions: [expect.objectContaining({
+        id: 'language',
+        options: [{ label: 'TypeScript', description: '推荐' }, { label: 'Rust' }],
+      })],
+    })])
+    expect(onChange).toHaveBeenCalledWith('session-1')
+
+    const id = bridge.list('session-1')[0]?.id ?? ''
+    await bridge.respond('session-1', id, {
       kind: 'question',
       answers: [{ id: 'language', selected: ['TypeScript'] }],
     })
-    expect(respond).toHaveBeenCalledWith({
-      type: 'client-response',
-      rpcId,
-      result: {
-        ok: true,
-        value: {
-          sessionId,
-          answer: { answers: [{ id: 'language', selected: ['TypeScript'] }] },
-        },
-      },
-    })
-    expect(bridge.list(String(sessionId))).toHaveLength(1)
 
-    resolved.resolve()
-    await vi.waitFor(() => { expect(bridge.list(String(sessionId))).toEqual([]) })
-    expect(onChange).toHaveBeenCalled()
+    await expect(pending).resolves.toEqual({
+      answers: [{ id: 'language', selected: ['TypeScript'] }],
+    })
+    expect(next).not.toHaveBeenCalled()
+    expect(bridge.list('session-1')).toEqual([])
     await bridge.dispose()
   })
 
-  it('uses the official one-shot approval outcome and drops stale requests', async () => {
-    const sessionId = SessionId('session-2')
-    const respond = vi.fn(async () => ({ accepted: false as const, reason: 'not-pending' as const }))
-    const bridge = new TeamInteractionBridge(contextWithMux([{
-      rpcId: RpcId('approval-rpc-1'),
-      payload: {
-        type: 'approval/requested',
-        sessionId,
-        approvalId: 'approval-1' as never,
-        toolName: 'bash',
-        reason: '需要访问工作区之外的路径',
-      },
-    }], respond), {
+  it('delegates a user-question request of a foreign session', async () => {
+    const events = new FakeEvents()
+    const bridge = new TeamInteractionBridge(events.context, {
+      acceptsSession: id => id === 'session-1',
+      onChange: vi.fn(),
+    })
+    bridge.start()
+    const next = vi.fn(async () => ({ answers: [{ id: 'language', selected: ['Rust'] }] }))
+    const pending = events.ask('user-questions/request', {
+      agent: { id: 'other-session' },
+      questions: [{ id: 'language', question: '选择语言？' }],
+    }, next)
+
+    await expect(pending).resolves.toEqual({ answers: [{ id: 'language', selected: ['Rust'] }] })
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(bridge.list('other-session')).toEqual([])
+    await bridge.dispose()
+  })
+
+  it('answers an approval request with the one-shot grant and clears the record', async () => {
+    const events = new FakeEvents()
+    const bridge = new TeamInteractionBridge(events.context, {
       acceptsSession: () => true,
       onChange: vi.fn(),
     })
-
     bridge.start()
-    await vi.waitFor(() => { expect(bridge.list(String(sessionId))).toHaveLength(1) })
-    await expect(bridge.respond(String(sessionId), 'approval:approval-1', {
+    const pending = events.ask('approval/request', {
+      agent: { id: 'session-2' },
+      toolName: 'bash',
+      callId: 'call-1',
+      reason: '需要访问工作区之外的路径',
+    })
+
+    expect(bridge.list('session-2')).toEqual([expect.objectContaining({
       kind: 'approval',
-      outcome: 'allowed-once',
-    })).rejects.toMatchObject({ code: 'INTERACTION_NOT_PENDING' })
-    expect(bridge.list(String(sessionId))).toEqual([])
+      toolName: 'bash',
+      callId: 'call-1',
+      reason: '需要访问工作区之外的路径',
+      approvalId: expect.any(String),
+    })])
+
+    const id = bridge.list('session-2')[0]?.id ?? ''
+    await bridge.respond('session-2', id, { kind: 'approval', outcome: 'allowed-once' })
+
+    await expect(pending).resolves.toBe('allowed-once')
+    expect(bridge.list('session-2')).toEqual([])
+    await bridge.dispose()
+  })
+
+  it('withdraws a pending approval when the request signal aborts', async () => {
+    const events = new FakeEvents()
+    const onChange = vi.fn()
+    const bridge = new TeamInteractionBridge(events.context, {
+      acceptsSession: () => true,
+      onChange,
+    })
+    bridge.start()
+    const controller = new AbortController()
+    const pending = events.ask('approval/request', {
+      agent: { id: 'session-3' },
+      toolName: 'bash',
+      signal: controller.signal,
+    })
+    expect(bridge.list('session-3')).toHaveLength(1)
+
+    controller.abort()
+
+    await expect(pending).rejects.toThrow('withdrawn')
+    expect(bridge.list('session-3')).toEqual([])
+    expect(onChange).toHaveBeenLastCalledWith('session-3')
+    await bridge.dispose()
+  })
+
+  it('rejects an answer for an unknown interaction', async () => {
+    const events = new FakeEvents()
+    const bridge = new TeamInteractionBridge(events.context, {
+      acceptsSession: () => true,
+      onChange: vi.fn(),
+    })
+    bridge.start()
+    await expect(bridge.respond('session-4', 'approval:missing', {
+      kind: 'approval',
+      outcome: 'rejected',
+    })).rejects.toMatchObject({ code: 'INTERACTION_NOT_FOUND' })
+    await bridge.dispose()
+  })
+
+  it('drops every pending interaction of a forgotten session', async () => {
+    const events = new FakeEvents()
+    const bridge = new TeamInteractionBridge(events.context, {
+      acceptsSession: () => true,
+      onChange: vi.fn(),
+    })
+    bridge.start()
+    const pending = events.ask('approval/request', { agent: { id: 'session-5' }, toolName: 'bash' })
+    bridge.forget('session-5')
+    expect(bridge.list('session-5')).toEqual([])
+    await expect(pending).rejects.toThrow('withdrawn')
     await bridge.dispose()
   })
 })
@@ -117,38 +165,37 @@ describe('normalizeQuestionAnswers', () => {
   })
 })
 
-interface Deferred<T> {
-  promise: Promise<T>
-  resolve: (value: T) => void
-}
+/** Minimal cordis Context that records waterfall listeners so tests can dispatch them. */
+class FakeEvents {
+  private readonly listeners = new Map<string, (request: never, next: () => unknown) => unknown>()
 
-function deferred<T = void>(): Deferred<T> {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>(done => { resolve = done })
-  return { promise, resolve }
-}
-
-function contextWithMux(
-  steps: Array<RpcRequest<MuxFrame> | Promise<void>>,
-  respond: (message: unknown) => Promise<unknown>,
-): Context {
-  return {
-    apiProxy: {
-      events: {
-        async *mux(_request: unknown, signal: AbortSignal): AsyncIterable<RpcRequest<MuxFrame>> {
-          for (const step of steps) {
-            if (step instanceof Promise) await step
-            else yield step
-          }
-          if (!signal.aborted) {
-            await new Promise<void>(resolve => signal.addEventListener('abort', () => { resolve() }, { once: true }))
-          }
-        },
-      },
-      respond,
+  readonly context = {
+    on: (name: string, listener: (request: never, next: () => unknown) => unknown) => {
+      this.listeners.set(name, listener)
+      return () => true
     },
     logger: {
+      warn: vi.fn(),
       error: vi.fn(),
     },
   } as unknown as Context
+
+  /**
+   * Dispatch one waterfall request through the registered listener.
+   * @param name - cordis event name.
+   * @param request - the pending request payload.
+   * @param next - delegation continuation; defaults to a failing stub.
+   * @returns the promise the answerer waterfall returned.
+   */
+  ask(
+    name: string,
+    request: Record<string, unknown>,
+    next: () => unknown = () => {
+      throw new Error(`agent-team delegated ${name}`)
+    },
+  ): Promise<unknown> {
+    const listener = this.listeners.get(name)
+    if (listener === undefined) throw new Error(`no listener registered for ${name}`)
+    return Promise.resolve(listener(request as never, next))
+  }
 }

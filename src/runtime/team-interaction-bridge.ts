@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import {
-  RpcId,
-  type MuxFrame,
-  type RpcRequest,
-} from '@deepseek-ai/dsh-host-apiproxy'
+import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval'
+import type { ApprovalRequestEvent } from '@deepseek-ai/dsh-user-approval/types'
+import type { AskUserQuestionAnswer, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionRequestEvent } from '@deepseek-ai/dsh-user-questions/types'
 import { AgentTeamError } from '../domain/errors.js'
 import type {
   InteractionResponseInput,
@@ -13,38 +12,50 @@ import type {
   QuestionItemView,
 } from '../transport/contracts.js'
 
-type QuestionRequestedFrame = Extract<MuxFrame, { type: 'question/requested' }>
-type ApprovalRequestedFrame = Extract<MuxFrame, { type: 'approval/requested' }>
+interface PendingInteractionBase {
+  id: string
+  sessionId: string
+  /** Settle the in-flight waterfall as withdrawn (request aborted, agent gone). */
+  abandon: () => void
+}
 
-type PendingInteractionRecord =
-  | {
-    id: string
-    kind: 'question'
-    rpcId: RpcRequest<MuxFrame>['rpcId']
-    sessionId: QuestionRequestedFrame['sessionId']
-    questions: QuestionItemView[]
-  }
-  | {
-    id: string
-    kind: 'approval'
-    rpcId: RpcRequest<MuxFrame>['rpcId']
-    sessionId: ApprovalRequestedFrame['sessionId']
-    approvalId: ApprovalRequestedFrame['approvalId']
-    toolName: string
-    callId?: string
-    reason?: string
-  }
+interface PendingQuestionRecord extends PendingInteractionBase {
+  kind: 'question'
+  questions: QuestionItemView[]
+  resolve: (answer: AskUserQuestionAnswer) => void
+  reject: (error: Error) => void
+}
+
+interface PendingApprovalRecord extends PendingInteractionBase {
+  kind: 'approval'
+  toolName: string
+  callId?: string
+  reason?: string
+  resolve: (outcome: ApprovalOutcome) => void
+  reject: (error: Error) => void
+}
+
+type PendingInteractionRecord = PendingQuestionRecord | PendingApprovalRecord
 
 export interface TeamInteractionScope {
   acceptsSession: (sessionId: string) => boolean
   onChange: (sessionId: string) => void
 }
 
+/**
+ * Answers the Harness approval and user-question seams for plugin-owned Agents.
+ *
+ * Harness 0.2.0 retired the client RPC multiplexer: a decision is a cordis
+ * waterfall (`approval/request`, `user-questions/request`) that stays open
+ * until an answerer claims it. This bridge claims the waterfall for its own
+ * Sessions, publishes the pending item over SSE, and settles the waiting
+ * promise when the workbench answers over HTTP.
+ */
 export class TeamInteractionBridge {
   private readonly records = new Map<string, PendingInteractionRecord>()
   private readonly scopes = new Set<TeamInteractionScope>()
-  private abortController: AbortController | undefined
-  private consumeTask: Promise<void> | undefined
+  private disposeApprovalListener: (() => boolean) | undefined
+  private disposeQuestionListener: (() => boolean) | undefined
 
   constructor(
     private readonly ctx: Context,
@@ -59,25 +70,24 @@ export class TeamInteractionBridge {
   }
 
   start(): void {
-    if (this.abortController !== undefined) return
-    const controller = new AbortController()
-    this.abortController = controller
-    this.consumeTask = this.consume(controller.signal).catch(error => {
-      if (!controller.signal.aborted) {
-        this.ctx.logger.error('agent-team: interaction mux stopped unexpectedly', error)
-      }
-    })
+    if (this.disposeApprovalListener !== undefined) return
+    this.disposeApprovalListener = this.ctx.on('approval/request', (request, next) => (
+      this.askApproval(request, next)
+    ))
+    this.disposeQuestionListener = this.ctx.on('user-questions/request', (request, next) => (
+      this.askQuestions(request, next)
+    ))
   }
 
   list(sessionId: string): PendingInteractionView[] {
     return [...this.records.values()]
-      .filter(record => String(record.sessionId) === sessionId)
+      .filter(record => record.sessionId === sessionId)
       .map(toView)
   }
 
   forget(sessionId: string): void {
     for (const [id, record] of this.records) {
-      if (String(record.sessionId) === sessionId) this.records.delete(id)
+      if (record.sessionId === sessionId) this.withdraw(id)
     }
   }
 
@@ -90,118 +100,110 @@ export class TeamInteractionBridge {
     if (record === undefined) {
       throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求已结束或不存在')
     }
-    if (String(record.sessionId) !== sessionId || !this.acceptsSession(sessionId)) {
+    if (record.sessionId !== sessionId || !this.acceptsSession(sessionId)) {
       throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求不属于指定的会话')
     }
-    let value: unknown
     if (record.kind === 'question') {
       if (response.kind !== 'question') {
         throw new AgentTeamError('INTERACTION_INVALID', '交互响应类型与待处理请求不匹配')
       }
-      value = {
-        sessionId: record.sessionId,
-        answer: { answers: normalizeQuestionAnswers(record.questions, response.answers) },
-      }
+      record.resolve({ answers: normalizeQuestionAnswers(record.questions, response.answers) })
     } else {
       if (response.kind !== 'approval') {
         throw new AgentTeamError('INTERACTION_INVALID', '交互响应类型与待处理请求不匹配')
       }
-      value = {
-        sessionId: record.sessionId,
-        approvalId: record.approvalId,
-        outcome: response.outcome,
-      }
+      record.resolve(response.outcome)
     }
-    const receipt = await this.ctx.apiProxy.respond({
-      type: 'client-response',
-      rpcId: record.rpcId,
-      result: { ok: true, value },
-    })
-    if (receipt.accepted) return
-    if (receipt.reason === 'not-pending') {
-      this.records.delete(record.id)
-      this.notifyChange(String(record.sessionId))
-      throw new AgentTeamError('INTERACTION_NOT_PENDING', '该交互请求已由其他页面处理')
-    }
-    throw new AgentTeamError('INTERACTION_INVALID', 'Harness 拒绝了该交互响应')
+    this.records.delete(interactionId)
+    this.notifyChange(sessionId)
   }
 
   async dispose(): Promise<void> {
-    const controller = this.abortController
-    this.abortController = undefined
-    controller?.abort()
-    await this.consumeTask
-    this.consumeTask = undefined
-    this.records.clear()
+    this.disposeApprovalListener?.()
+    this.disposeQuestionListener?.()
+    this.disposeApprovalListener = undefined
+    this.disposeQuestionListener = undefined
+    for (const id of [...this.records.keys()]) this.withdraw(id)
   }
 
-  private async consume(signal: AbortSignal): Promise<void> {
-    const stream = this.ctx.apiProxy.events.mux({
-      rpcId: RpcId(randomUUID()),
-      payload: {},
-    }, signal)
-    for await (const envelope of stream) {
-      if (signal.aborted) return
-      this.accept(envelope)
-    }
-  }
-
-  private accept(envelope: RpcRequest<MuxFrame>): void {
-    const frame = envelope.payload
-    if (frame.type === 'question/requested') {
-      if (!this.acceptsSession(String(frame.sessionId))) return
-      const record: PendingInteractionRecord = {
-        id: `question:${String(envelope.rpcId)}`,
-        kind: 'question',
-        rpcId: envelope.rpcId,
-        sessionId: frame.sessionId,
-        questions: frame.questions.map(question => ({
-          id: question.id,
-          question: question.question,
-          ...(question.detail === undefined ? {} : { detail: question.detail }),
-          ...(question.header === undefined ? {} : { header: question.header }),
-          ...(question.options === undefined ? {} : {
-            options: question.options.map(option => ({
-              label: option.label,
-              ...(option.description === undefined ? {} : { description: option.description }),
-            })),
-          }),
-          ...(question.multiSelect === undefined ? {} : { multiSelect: question.multiSelect }),
-          ...(question.intent === undefined ? {} : { intent: { ...question.intent } }),
-        })),
-      }
-      this.records.set(record.id, record)
-      this.notifyChange(String(frame.sessionId))
-      return
-    }
-    if (frame.type === 'approval/requested') {
-      if (!this.acceptsSession(String(frame.sessionId))) return
-      const record: PendingInteractionRecord = {
-        id: `approval:${String(frame.approvalId)}`,
+  /**
+   * Claim one approval request for an owned Session, delegating every other one.
+   * @param request - the pending approval decision.
+   * @param next - delegate the decision to the remaining answerers.
+   * @returns the human's outcome, or the delegated outcome.
+   */
+  private askApproval(
+    request: ApprovalRequestEvent,
+    next: () => Promise<ApprovalOutcome>,
+  ): Promise<ApprovalOutcome> {
+    const sessionId = String(request.agent.id)
+    if (!this.acceptsSession(sessionId)) return next()
+    const reason = request.displayReason?.en ?? request.reason
+    return new Promise<ApprovalOutcome>((resolve, reject) => {
+      const record: PendingApprovalRecord = {
+        id: `approval:${randomUUID()}`,
         kind: 'approval',
-        rpcId: envelope.rpcId,
-        sessionId: frame.sessionId,
-        approvalId: frame.approvalId,
-        toolName: frame.toolName,
-        ...(frame.callId === undefined ? {} : { callId: String(frame.callId) }),
-        ...(frame.reason === undefined ? {} : { reason: frame.reason }),
+        sessionId,
+        toolName: request.toolName,
+        ...(request.callId === undefined ? {} : { callId: String(request.callId) }),
+        ...(reason === undefined ? {} : { reason }),
+        resolve,
+        reject,
+        abandon: () => {
+          reject(new Error('agent-team: the approval request was withdrawn'))
+        },
       }
-      this.records.set(record.id, record)
-      this.notifyChange(String(frame.sessionId))
-      return
-    }
-    if (frame.type === 'question/resolved') {
-      this.remove(`question:${String(frame.questionRpcId)}`, String(frame.sessionId))
-      return
-    }
-    if (frame.type === 'approval/resolved') {
-      this.remove(`approval:${String(frame.approvalId)}`, String(frame.sessionId))
-    }
+      this.attach(record, request.signal)
+      this.notifyChange(sessionId)
+    })
   }
 
-  private remove(id: string, sessionId: string): void {
-    if (!this.records.delete(id)) return
-    this.notifyChange(sessionId)
+  /**
+   * Claim one user-question request for an owned Session, delegating every other one.
+   * @param request - the pending questions.
+   * @param next - delegate the questions to the remaining answerers.
+   * @returns the human's answers, or the delegated answers.
+   */
+  private askQuestions(
+    request: AskUserQuestionRequestEvent,
+    next: () => Promise<AskUserQuestionAnswer>,
+  ): Promise<AskUserQuestionAnswer> {
+    const sessionId = request.agent === undefined ? undefined : String(request.agent.id)
+    if (sessionId === undefined || !this.acceptsSession(sessionId)) return next()
+    const questions = request.questions.map(toQuestionView)
+    return new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+      const record: PendingQuestionRecord = {
+        id: `question:${randomUUID()}`,
+        kind: 'question',
+        sessionId,
+        questions,
+        resolve,
+        reject,
+        abandon: () => {
+          reject(new Error('agent-team: the question request was withdrawn'))
+        },
+      }
+      this.attach(record, request.signal)
+      this.notifyChange(sessionId)
+    })
+  }
+
+  private attach(record: PendingInteractionRecord, signal: AbortSignal | undefined): void {
+    this.records.set(record.id, record)
+    if (signal === undefined) return
+    if (signal.aborted) {
+      this.withdraw(record.id)
+      return
+    }
+    signal.addEventListener('abort', () => { this.withdraw(record.id) }, { once: true })
+  }
+
+  private withdraw(id: string): void {
+    const record = this.records.get(id)
+    if (record === undefined) return
+    this.records.delete(id)
+    record.abandon()
+    this.notifyChange(record.sessionId)
   }
 
   private acceptsSession(sessionId: string): boolean {
@@ -242,11 +244,8 @@ export function normalizeQuestionAnswers(
     if (selected.some(label => !allowed.has(label))) {
       throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”包含无效选项`)
     }
-    if (question.multiSelect !== true && selected.length > 1) {
-      throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”只能选择一个选项`)
-    }
     const custom = answer.custom?.trim()
-    if (question.multiSelect !== true && custom !== undefined && custom.length > 0 && selected.length > 0) {
+    if (question.multiSelect !== true && selected.length > 0 && custom !== undefined && custom.length > 0) {
       throw new AgentTeamError('INTERACTION_INVALID', `问题“${question.id}”的自定义答案不能与单选项同时提交`)
     }
     if (selected.length === 0 && (custom === undefined || custom.length === 0)) {
@@ -260,6 +259,25 @@ export function normalizeQuestionAnswers(
   })
 }
 
+function toQuestionView(question: AskUserQuestionItem): QuestionItemView {
+  return {
+    id: question.id,
+    question: question.question,
+    ...(question.detail === undefined ? {} : { detail: question.detail }),
+    ...(question.header === undefined ? {} : { header: question.header }),
+    ...(question.options === undefined ? {} : {
+      options: question.options.map(option => ({
+        label: option.label,
+        ...(option.description === undefined ? {} : { description: option.description }),
+      })),
+    }),
+    ...(question.multiSelect === undefined ? {} : { multiSelect: question.multiSelect }),
+    ...(question.intent === undefined ? {} : {
+      intent: { kind: question.intent.kind, approve: question.intent.approve },
+    }),
+  }
+}
+
 function toView(record: PendingInteractionRecord): PendingInteractionView {
   if (record.kind === 'question') {
     return { id: record.id, kind: record.kind, questions: record.questions }
@@ -267,7 +285,7 @@ function toView(record: PendingInteractionRecord): PendingInteractionView {
   return {
     id: record.id,
     kind: record.kind,
-    approvalId: String(record.approvalId),
+    approvalId: record.id,
     toolName: record.toolName,
     ...(record.callId === undefined ? {} : { callId: record.callId }),
     ...(record.reason === undefined ? {} : { reason: record.reason }),

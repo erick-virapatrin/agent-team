@@ -583,7 +583,7 @@ describe('AgentTeamService', () => {
     expect(ensureMemberOnline).toHaveBeenCalledOnce()
     expect(leaderAgent.followup).toHaveBeenCalledOnce()
     expect(leaderAgent.followup.mock.calls[0]?.[0]).toMatchObject({
-      source: { kind: 'plugin', plugin: 'dsh-agent-team', form: 'relay' },
+      source: { kind: 'agent-team', plugin: 'dsh-agent-team', form: 'relay' },
       content: [{ type: 'text', text: expect.stringContaining(member.id) }],
     })
     expect(Object.keys(added.outbox)).toHaveLength(0)
@@ -679,7 +679,7 @@ describe('AgentTeamService', () => {
     expect(service.listMessages(team.id).items[0]?.deliveryState).toBe('failed')
 
     memberAgent.followup.mockImplementation(message => {
-      memberAgent.session.events.push({
+      memberAgent.session.snapshotEvents().push({
         type: 'agent/inbox/spliced',
         data: { inserted: [message] },
       })
@@ -752,7 +752,7 @@ describe('AgentTeamService', () => {
     expect(leaderAgent.followup).toHaveBeenCalledOnce()
     expect(leaderAgent.followup.mock.calls[0]?.[0]).toMatchObject({
       role: 'user',
-      source: { kind: 'plugin', plugin: 'dsh-agent-team', form: 'relay' },
+      source: { kind: 'agent-team', plugin: 'dsh-agent-team', form: 'relay' },
       content: [{ type: 'text', text: expect.stringContaining(member.id) }],
     })
     expect(Object.keys(removed.outbox)).toHaveLength(0)
@@ -868,7 +868,10 @@ function createHarness(workspacePath = '/tmp/agent-team-workspace'): {
   ctx.provide('agentPresets', {
     list: async () => [{ id: 'default', name: 'Default' }],
     resolve: async (id: string) => ({ id, name: id }),
-    standingKeyFor: async () => ({ kind: 'preset-scope' }),
+    acquireScope: async () => ({
+      key: { kind: 'preset-scope' },
+      [Symbol.asyncDispose]: async () => {},
+    }),
   } as never)
   ctx.provide('tools', {
     get: (name: string) => name === 'skill' ? { name: 'skill' } : undefined,
@@ -930,7 +933,7 @@ interface FakeAgent {
   cancel: ReturnType<typeof vi.fn>
   whenIdle: ReturnType<typeof vi.fn>
   status: 'idle' | 'running'
-  session: { events: Array<{ type: string; data: { inserted: unknown[] } }> }
+  session: { snapshotEvents: () => Array<{ type: string; data: { inserted: unknown[] } }> }
 }
 
 interface RuntimeInternals {
@@ -947,12 +950,13 @@ function runtimeInternals(runtime: TeamRuntime): RuntimeInternals {
 }
 
 function fakeAgent(): FakeAgent {
-  const session: FakeAgent['session'] = { events: [] }
+  const events: Array<{ type: string; data: { inserted: unknown[] } }> = []
+  const session: FakeAgent['session'] = { snapshotEvents: () => events }
   return {
     session,
     status: 'idle',
     followup: vi.fn(message => {
-      session.events.push({ type: 'agent/inbox/spliced', data: { inserted: [message] } })
+      events.push({ type: 'agent/inbox/spliced', data: { inserted: [message] } })
     }),
     cancel: vi.fn(),
     whenIdle: vi.fn(async () => {}),

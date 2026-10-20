@@ -1,9 +1,20 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import { Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Modal, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './AgentTeam.module.css'
 
 const DIALOG_EXIT_MS = 140
+
+/**
+ * Localized Markdown chrome for every plugin renderer.
+ *
+ * Module-level so its identity is reference-stable: `MarkdownText` drops its
+ * streaming render cache when the label object identity changes.
+ */
+export const MARKDOWN_LABELS: MarkdownLabels = {
+  code: { copyLabel: '复制', copiedLabel: '已复制' },
+  footnotes: '脚注',
+}
 
 export function AnimatedModal(props: ComponentProps<typeof Modal>): JSX.Element | null {
   const [rendered, setRendered] = useState(props.open)

@@ -54,6 +54,7 @@ export const AGENT_TEAM_METHODS = [
   'team.workspace.search',
   'team.workspace.changes',
   'team.workspace.diff',
+  'workspace.pick',
   'team.dissolve',
 ] as const
 
@@ -387,6 +388,7 @@ export interface AgentTeamRequestMap {
     }
     result: WorkspaceGitDiffView
   }
+  'workspace.pick': { payload: undefined; result: { path: string | null } }
   'team.dissolve': { payload: { teamId: string; confirmation: string }; result: null }
 }
 

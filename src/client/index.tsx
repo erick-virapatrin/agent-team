@@ -1,6 +1,9 @@
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import { callAgentTeam } from './api.js'
 import {
   AgentTeamOverlay,
   AgentTeamSettingsSection,
@@ -23,7 +26,7 @@ export function apply(ctx: ClientContext): void {
       label: '团队',
       inject: (): { pickWorkspace: () => Promise<WorkspaceChoice | null> } => ({
         pickWorkspace: async () => {
-          const path = await ctx.workspaces.pickDirectory()
+          const { path } = await callAgentTeam('workspace.pick')
           if (path === null) return null
           const workspace = await ctx.workspaces.create({ path })
           return {

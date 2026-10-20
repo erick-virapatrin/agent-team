@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { freezeMessage, MessageId, type UserMessage } from '@deepseek-ai/dsh-llm'
+import { AGENT_TEAM_MESSAGE_SOURCE } from '../domain/message-source.js'
 import { AgentTeamError } from '../domain/errors.js'
 import type { TeamAggregate, TeamMessage } from '../domain/types.js'
+import { liveSessionEvents } from './session-log.js'
 
 type TaskStatus = 'pending' | 'assigned' | 'running' | 'blocked' | 'completed' | 'failed' | 'cancelled'
 
@@ -112,7 +114,7 @@ export function messageFromRecord(team: TeamAggregate, record: TeamMessage): Use
       id: MessageId(record.id),
       role: 'user',
       content: [{ type: 'text', text: `[Team event]\n${record.content}` }],
-      source: { kind: 'plugin', plugin: 'dsh-agent-team', form: 'relay' },
+      source: AGENT_TEAM_MESSAGE_SOURCE,
     })
   }
   const sender = record.sender.kind === 'member' ? team.members[record.sender.id] : undefined
@@ -127,9 +129,7 @@ export function messageFromRecord(team: TeamAggregate, record: TeamMessage): Use
     id: MessageId(record.id),
     role: 'user',
     content: [{ type: 'text', text }],
-    source: record.sender.kind === 'member'
-      ? { kind: 'plugin', plugin: 'dsh-agent-team', form: 'relay' }
-      : { kind: 'user' },
+    source: record.sender.kind === 'member' ? AGENT_TEAM_MESSAGE_SOURCE : { kind: 'user' },
   })
 }
 
@@ -138,7 +138,7 @@ export function teamMessageHeader(displayName: string, slotId: string): string {
 }
 
 export function sessionHasMessage(agent: Agent, messageId: string): boolean {
-  return agent.session.events.some(event => {
+  return liveSessionEvents(agent.session).some(event => {
     if (event.type !== 'agent/inbox/spliced') return false
     return event.data.inserted.some(message => String(message.id) === messageId)
   })

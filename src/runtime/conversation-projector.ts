@@ -1,16 +1,129 @@
-import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
+import type { AssistantStreamFrame } from '@deepseek-ai/dsh-agent'
+import {
+  runFirstTokenTime,
+  runFirstVisibleTime,
+  type AssistantStreamRecord,
+  type ContentBlock,
+  type MessageSource,
+  type StreamChunk,
+} from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { isAgentTeamRelaySource } from '../domain/message-source.js'
 import type { TeamAggregate, TeamMessage } from '../domain/types.js'
 import type { ConversationNode, MemberConversationView } from '../transport/contracts.js'
 
-interface PartialAssistant {
-  id: string
-  seq: number
-  time: number
+/** One in-flight assistant output, folded from live `agent/assistant-stream` frames. */
+export interface LiveAssistantPartial {
+  turn: number
+  step: number
   text: string
   reasoning: string
+  startedAt: number
+  updatedAt: number
   reasoningStartedAt?: number
   reasoningCompletedAt?: number
+}
+
+/**
+ * Live assistant streams per Session.
+ *
+ * Harness 0.2.0 no longer appends `assistant/chunk` events to the Session log: a
+ * model attempt is published as transient `agent/assistant-stream` frames and
+ * only the settled `assistant/message` (with its compact embedded stream)
+ * enters the log. The workbench keeps token-by-token rendering by folding the
+ * live frames beside the logged events.
+ */
+export class AssistantStreamTracker {
+  private readonly sessions = new Map<string, Map<string, LiveAssistantPartial>>()
+
+  /**
+   * Apply one live stream publication of one Session.
+   * @param sessionId - Session the publishing agent owns.
+   * @param frame - one start, chunk, or end publication.
+   * @returns nothing.
+   */
+  observe(sessionId: string, frame: AssistantStreamFrame): void {
+    const key = String(frame.attemptId)
+    if (frame.type === 'start') {
+      const streams = this.sessions.get(sessionId) ?? new Map<string, LiveAssistantPartial>()
+      const time = Date.now()
+      streams.set(key, {
+        turn: frame.turn,
+        step: frame.step,
+        text: '',
+        reasoning: '',
+        startedAt: time,
+        updatedAt: time,
+      })
+      this.sessions.set(sessionId, streams)
+      return
+    }
+    const streams = this.sessions.get(sessionId)
+    const current = streams?.get(key)
+    if (streams === undefined || current === undefined) return
+    if (frame.type === 'end') {
+      streams.delete(key)
+      if (streams.size === 0) this.sessions.delete(sessionId)
+      return
+    }
+    applyStreamChunk(current, frame.chunk, frame.time)
+  }
+
+  /**
+   * In-flight assistant outputs of one Session, oldest first.
+   * @param sessionId - the Session to read.
+   * @returns every partial stream with reader-visible content.
+   */
+  list(sessionId: string): readonly LiveAssistantPartial[] {
+    return [...(this.sessions.get(sessionId)?.values() ?? [])]
+      .filter(partial => partial.text.length > 0 || partial.reasoning.length > 0)
+      .sort((left, right) => left.turn - right.turn || left.step - right.step)
+  }
+
+  /**
+   * Drop every in-flight stream of one Session, for example when its agent goes away.
+   * @param sessionId - the Session to clear.
+   * @returns nothing.
+   */
+  clear(sessionId: string): void {
+    this.sessions.delete(sessionId)
+  }
+}
+
+function applyStreamChunk(
+  partial: LiveAssistantPartial,
+  chunk: StreamChunk,
+  time: number,
+): void {
+  partial.updatedAt = time
+  if (chunk.type === 'text-delta') {
+    partial.text += chunk.text
+    if (chunk.text.length > 0 && partial.reasoningStartedAt !== undefined) {
+      partial.reasoningCompletedAt ??= time
+    }
+    return
+  }
+  if (chunk.type === 'reasoning-delta') {
+    partial.reasoning += chunk.text
+    if (chunk.text.length > 0) {
+      partial.reasoningStartedAt ??= time
+      if (partial.text.length > 0) partial.reasoningCompletedAt ??= time
+    }
+    return
+  }
+  if (chunk.type !== 'block-end') return
+  if (chunk.block.type === 'text') {
+    partial.text = chunk.block.text
+    if (partial.reasoningStartedAt !== undefined) partial.reasoningCompletedAt ??= time
+    return
+  }
+  if (chunk.block.type === 'reasoning') {
+    partial.reasoning = chunk.block.text
+    if (chunk.block.text.length > 0) {
+      partial.reasoningStartedAt ??= time
+      partial.reasoningCompletedAt ??= time
+    }
+  }
 }
 
 interface TeamProjectionContext {
@@ -32,13 +145,9 @@ export function projectContextUsage(
 
   for (const event of events) {
     if (event.type === 'request/context') contextWindow = event.data.contextWindow
-
-    const usage = event.type === 'assistant/chunk' && event.data.chunk.type === 'usage'
-      ? event.data.chunk.usage
-      : event.type === 'assistant/message'
-        ? event.data.usage
-        : undefined
-    if (usage !== undefined) latestUsage = usage
+    if (event.type === 'assistant/message' && event.data.usage !== undefined) {
+      latestUsage = event.data.usage
+    }
   }
 
   if (latestUsage === undefined) return undefined
@@ -61,13 +170,13 @@ export function projectConversation(
   events: readonly SessionEvent[],
   limit = 240,
   teamContext?: TeamProjectionContext,
+  live: readonly LiveAssistantPartial[] = [],
 ): {
   throughSeq: number
   nodes: ConversationNode[]
 } {
   const nodes: ConversationNode[] = []
   const tools = new Map<string, number>()
-  const partials = new Map<string, PartialAssistant>()
   const teamMessages = new Map(teamContext?.messages.map(message => [message.id, message]) ?? [])
 
   for (const event of events) {
@@ -92,49 +201,10 @@ export function projectConversation(
         }
         break
       }
-      case 'assistant/chunk': {
-        const key = `${event.data.turn}:${event.data.step}`
-        const current = partials.get(key) ?? {
-          id: `stream:${key}`,
-          seq: event.seq,
-          time: event.time,
-          text: '',
-          reasoning: '',
-        }
-        const chunk = event.data.chunk
-        if (chunk.type === 'text-delta') {
-          current.text += chunk.text
-          if (chunk.text.length > 0 && current.reasoningStartedAt !== undefined) {
-            current.reasoningCompletedAt ??= event.time
-          }
-        }
-        if (chunk.type === 'reasoning-delta') {
-          current.reasoning += chunk.text
-          if (chunk.text.length > 0) {
-            current.reasoningStartedAt ??= event.time
-            if (current.text.length > 0) current.reasoningCompletedAt ??= event.time
-          }
-        }
-        if (chunk.type === 'block-end' && chunk.block.type === 'text') {
-          current.text = chunk.block.text
-          if (current.reasoningStartedAt !== undefined) current.reasoningCompletedAt ??= event.time
-        }
-        if (chunk.type === 'block-end' && chunk.block.type === 'reasoning') {
-          current.reasoning = chunk.block.text
-          if (chunk.block.text.length > 0) {
-            current.reasoningStartedAt ??= current.time
-            current.reasoningCompletedAt ??= event.time
-          }
-        }
-        current.seq = event.seq
-        partials.set(key, current)
-        break
-      }
       case 'assistant/message': {
-        const partial = partials.get(`${event.data.turn}:${event.data.step}`)
-        partials.delete(`${event.data.turn}:${event.data.step}`)
         const text = textOf(event.data.message.content)
         const reasoning = reasoningOf(event.data.message.content)
+        const timing = reasoningTiming(event.data.stream)
         if (text.length > 0 || reasoning.length > 0) nodes.push({
           id: String(event.data.message.id),
           kind: 'assistant',
@@ -142,9 +212,9 @@ export function projectConversation(
           time: event.time,
           text,
           ...(reasoning.length === 0 ? {} : { reasoning }),
-          ...(partial?.reasoningStartedAt === undefined ? {} : {
-            reasoningStartedAt: partial.reasoningStartedAt,
-            reasoningCompletedAt: partial.reasoningCompletedAt ?? event.time,
+          ...(timing.reasoningStartedAt === undefined ? {} : {
+            reasoningStartedAt: timing.reasoningStartedAt,
+            reasoningCompletedAt: timing.reasoningCompletedAt ?? event.time,
           }),
         })
         break
@@ -165,18 +235,20 @@ export function projectConversation(
         break
       }
       case 'tool/result': {
-        const callId = String(event.data.message.content[0].toolCallId)
+        const resultMessage = event.data.message
+        const callId = String(resultMessage.toolCallId)
         const index = tools.get(callId)
-        const result = textOf(event.data.message.content[0].content)
+        const result = textOf(resultMessage.content)
         const error = event.data.error === undefined
           ? undefined
           : `${event.data.error.name}: ${event.data.error.code}`
+        const failed = resultMessage.isError === true || error !== undefined
         if (index !== undefined) {
           const node = nodes[index]
           if (node?.kind === 'tool') nodes[index] = {
             ...node,
             seq: event.seq,
-            status: event.data.message.content[0].isError === true || error !== undefined ? 'error' : 'success',
+            status: failed ? 'error' : 'success',
             ...(result.length === 0 ? {} : { result }),
             ...(error === undefined ? {} : { error }),
           }
@@ -189,7 +261,7 @@ export function projectConversation(
             callId,
             name: 'tool',
             arguments: '',
-            status: event.data.message.content[0].isError === true || error !== undefined ? 'error' : 'success',
+            status: failed ? 'error' : 'success',
             ...(result.length === 0 ? {} : { result }),
             ...(error === undefined ? {} : { error }),
           })
@@ -218,13 +290,13 @@ export function projectConversation(
     }
   }
 
-  for (const partial of partials.values()) {
-    if (partial.text.length === 0 && partial.reasoning.length === 0) continue
+  const throughSeq = events.at(-1)?.seq ?? -1
+  for (const partial of live) {
     nodes.push({
-      id: partial.id,
+      id: `stream:${partial.turn}:${partial.step}`,
       kind: 'assistant',
-      seq: partial.seq,
-      time: partial.time,
+      seq: throughSeq + 1,
+      time: partial.startedAt,
       text: partial.text,
       ...(partial.reasoning.length === 0 ? {} : { reasoning: partial.reasoning }),
       ...(partial.reasoningStartedAt === undefined ? {} : {
@@ -238,8 +310,49 @@ export function projectConversation(
   }
   nodes.sort((left, right) => left.seq - right.seq)
   return {
-    throughSeq: events.at(-1)?.seq ?? -1,
+    throughSeq,
     nodes: nodes.slice(-limit),
+  }
+}
+
+/**
+ * Locate the reasoning timing of one settled assistant message in its compact stream.
+ * @param stream - the stream embedded in the `assistant/message` event.
+ * @returns the reasoning bounds the transcript renders, absent when the model never reasoned.
+ */
+function reasoningTiming(
+  stream: readonly AssistantStreamRecord[],
+): { reasoningStartedAt?: number; reasoningCompletedAt?: number } {
+  let reasoningStartedAt: number | undefined
+  let reasoningCompletedAt: number | undefined
+  for (const record of stream) {
+    if (record.type === 'reasoning-chunks') {
+      const first = runFirstVisibleTime(record)
+      if (first !== undefined && reasoningStartedAt === undefined) reasoningStartedAt = first
+      continue
+    }
+    if (record.type === 'chunk') {
+      if (record.chunk.type === 'block-end' && record.chunk.block.type === 'reasoning') {
+        reasoningStartedAt ??= record.time
+        continue
+      }
+      if (
+        reasoningStartedAt !== undefined
+        && record.chunk.type === 'block-end'
+        && record.chunk.block.type === 'text'
+      ) {
+        reasoningCompletedAt ??= record.time
+      }
+      continue
+    }
+    if (record.type === 'text-chunks' && reasoningStartedAt !== undefined) {
+      const firstText = runFirstTokenTime(record)
+      if (firstText !== undefined) reasoningCompletedAt ??= firstText
+    }
+  }
+  return {
+    ...(reasoningStartedAt === undefined ? {} : { reasoningStartedAt }),
+    ...(reasoningCompletedAt === undefined ? {} : { reasoningCompletedAt }),
   }
 }
 
@@ -281,15 +394,12 @@ function teamMessageNode(
 }
 
 function isVisibleUserSource(source: MessageSource): boolean {
-  if (source.kind === 'user') return true
-  if (source.kind !== 'plugin') return false
-  return source.plugin === 'dsh-agent-team' && source.form === 'relay'
+  return source.kind === 'user' || isAgentTeamRelaySource(source)
 }
 
 function textOf(blocks: readonly ContentBlock[]): string {
   return blocks.flatMap(block => {
     if (block.type === 'text') return [block.text]
-    if (block.type === 'tool-result') return [textOf(block.content)]
     if (block.type === 'image') return ['[图片]']
     return []
   }).filter(Boolean).join('\n')
