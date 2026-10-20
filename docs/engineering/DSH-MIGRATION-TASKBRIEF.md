@@ -1,113 +1,113 @@
-# Brief de mission de migration DSH (réutilisable, autonome)
+# DSH migration mission brief (reusable, self-contained)
 
-Version optimisée du brief AGTEAM-COMPAT-001 : **~130 lignes contre ~470 pour l'original**, avec
-les faits qui ont coûté des cycles intégrés (préflight, formes CLI, périmètres d'approbation,
-mocks conformes, preuve d'exécution). Marque **[U]** = universel, **[0.2]** = propre à 0.1→0.2.
+Optimized version of the AGTEAM-COMPAT-001 brief: **~130 lines vs ~470 for the original**, with
+the facts that cost integrated cycles (preflight, CLI argument forms, approval scopes,
+faithful mocks, runtime proof). Marker **[U]** = universal, **[0.2]** = specific to 0.1→0.2.
 
-Utilisation : copier le bloc ci-dessous, remplir les 6 champs d'entrée. Ne pas ajouter de contexte
-non demandé : chaque paragraphe supplémentaire du brief original a coûté des relectures.
+Usage: copy the block below, fill in the 6 input fields. Do not add context that was not
+asked for: every extra paragraph of the original brief cost re-reads.
 
 ```text
-MISSION : migrer le plugin Agent Team de DSH {{VERSION_SOURCE}} vers DSH {{VERSION_CIBLE}}.
-Dépôt : {{DEPOT}} (upstream {{REMOTE_UPSTREAM}}, fork push {{REMOTE_FORK}}).
-Interdictions : ne PAS toucher au code du harness ; ne PAS bump de version du plugin ;
-ne PAS refactorer ; ne PAS fusionner (le PO décide) ; open PR only.
-Livrable : branche {{BRANCHE}} + PR, base {{BASE_SHA}} (SHA vérifié, pas "main").
-Langue des réponses : {{LANGUE}}. Identifiants, commandes et API en anglais exact.
+MISSION: migrate the Agent Team plugin from DSH {{VERSION_SOURCE}} to DSH {{VERSION_CIBLE}}.
+Repo: {{DEPOT}} (upstream {{REMOTE_UPSTREAM}}, fork push {{REMOTE_FORK}}).
+Prohibitions: do NOT touch the harness code; do NOT bump the plugin version;
+do NOT refactor; do NOT merge (the PO decides); open PR only.
+Deliverable: branch {{BRANCHE}} + PR, base {{BASE_SHA}} (verified SHA, not "main").
+Response language: {{LANGUE}}. Identifiers, commands and APIs in exact English.
 
-FAITS D'ENVIRONNEMENT (ne pas les redécouvrir)
-- Runtime DSH installé : {{CHEMIN_RUNTIME_DSH}} ; version : {{VERSION_CIBLE}}.
-- Politique de fichiers du sandbox : workspace-write. Écrire dans ~/.dsh demande une approbation :
-  regroupe TOUTES les écritures de profil dans une seule commande, et demande une seule
-  approbation de périmètre pour ~/.dsh/profiles/{{PROFIL_TEST}}.
-- Cache npm global en lecture seule : ALWAYS `npm --cache .scratch/npm-cache …`.
-- Aucun fournisseur LLM utilisable : la preuve de streaming passe par le stub local (§7).
-- Forme CLI : le nom de profil est POSITIONNEL (`dsh <profil> --dump-config`), seul `dsh plugin`
-  prend `--profile`. `dsh web --profile X` est invalide.
+ENVIRONMENT FACTS (do not rediscover them)
+- Installed DSH runtime: {{CHEMIN_RUNTIME_DSH}}; version: {{VERSION_CIBLE}}.
+- Sandbox file policy: workspace-write. Writing in ~/.dsh requires an approval:
+  group ALL profile writes into a single command, and request a single
+  scope approval for ~/.dsh/profiles/{{PROFIL_TEST}}.
+- Global npm cache is read-only: ALWAYS `npm --cache .scratch/npm-cache …`.
+- No usable LLM provider: the streaming proof goes through the local stub (§7).
+- CLI argument form: the profile name is POSITIONAL (`dsh <profile> --dump-config`), only `dsh plugin`
+  takes `--profile`. `dsh web --profile X` is invalid.
 
-ORDRE OBLIGATOIRE (ne pas réordonner)
-1. Préflight [U] : `node -v`, version du runtime, `npm --cache .scratch/npm-cache ci`,
-   `npm run check` (baseline verte sur la version courante). Un gate rouge ici = problème
-   d'environnement : réparer avant de migrer. Ne jamais pipeer une commande de gate.
-2. Analyse d'écarts [U] : `node docs/engineering/tooling/dsh-api-surface.mjs --imports … --base …
-   --target …` → la liste de travail (symboles manquants, signatures modifiées, services disparus).
-   Puis `npx tsc --noEmit > .scratch/tc.txt 2>&1; grep -c "error TS" .scratch/tc.txt` après avoir
-   aligné package.json (peers) : le recensement d'erreurs EST le plan de port.
-3. peers [0.2] : TOUS les `@deepseek-ai/dsh*` + `cordis` alignés sur le runtime. Le gate du
-   chargeur évalue `semver.satisfies(runtime, peer, {includePrerelease:true})` sur CHAQUE peer
-   (`dsh-app-boot/lib/index.js`). Preuve : `dsh {{PROFIL_TEST}} --dump-config` liste `- id: agent-team`.
-4. Port par couches [U] : domain → runtime → service/transport → client → tests. Un fichier à la
-   fois, `npx tsc --noEmit` après chaque fichier. Renommage de masse (icônes) : script de
-   substitution + vérification du diff, pas d'éditions unitaires.
-5. Règle de mocks [0.2] : chaque double de test reproduit la signature du `.d.ts` installé
-   (`snapshotEvents()`, `setup(agentCtx, agent)`, `open/read/close`, `handle.header`). Typer les
-   doubles avec l'interface réelle pour que le typecheck refuse un mock incomplet.
-6. Gate final [U] : `npm run check` (garde d'architecture + typecheck + tests + build), puis `npm ci`
-   propre et re-`npm run check`.
-7. Preuve d'exécution [U] — NON COUVERTE par le build, obligatoire :
-   a. profil de test `--from-default-profile web` (sans bundle expérimental concurrent),
-   b. `dsh plugin --profile {{PROFIL_TEST}} add link:{{ABS_PATH}}` + `--dump-config` (gate de charge),
-   c. boot `dsh {{PROFIL_TEST}} --no-open --port {{PORT}}`, enregistrement du client dans le log,
-   d. sondes API : corps `{requestId, method, payload}`, identifiants sous `{ id }` ; lire
-      `src/transport/contracts.ts` avant d'écrire une sonde (ex. `workbench.conversations`),
-   e. équipe 2 membres + message + `lastActiveAt` ; arrêt en cours de tour ; messages inter-agents,
-   f. redémarrage du serveur → projection des sessions PERSISTÉES (reprise à froid),
-   g. streaming via stub OpenAI local : nœud live croissant puis nœud durable ; `usage` non nul.
-   Utiliser le script d'intégration s'il existe ; sinon l'écrire dans
-   `docs/engineering/tooling/` et le réutiliser.
-8. Livrable [U] : commits conventionnels découpés (deps / runtime / client / tests), PR vers
-   {{REMOTE_UPSTREAM}} : base, head SHA, ce qui a migré (avant → après), ce qui est prouvé à
-   l'exécution, limites connues.
+MANDATORY ORDER (do not reorder)
+1. Preflight [U]: `node -v`, runtime version, `npm --cache .scratch/npm-cache ci`,
+   `npm run check` (green baseline on the current version). A red gate here = an environment
+   problem: fix it before migrating. Never pipe a gate command.
+2. Gap analysis [U]: `node docs/engineering/tooling/dsh-api-surface.mjs --imports … --base …
+   --target …` → the work list (missing symbols, changed signatures, vanished services).
+   Then `npx tsc --noEmit > .scratch/tc.txt 2>&1; grep -c "error TS" .scratch/tc.txt` after
+   aligning package.json (peers): the error census IS the port plan.
+3. peers [0.2]: ALL `@deepseek-ai/dsh*` + `cordis` aligned with the runtime. The loader gate
+   evaluates `semver.satisfies(runtime, peer, {includePrerelease:true})` on EACH peer
+   (`dsh-app-boot/lib/index.js`). Proof: `dsh {{PROFIL_TEST}} --dump-config` lists `- id: agent-team`.
+4. Layered port [U]: domain → runtime → service/transport → client → tests. One file at a
+   time, `npx tsc --noEmit` after each file. Mass rename (icons): substitution script +
+   diff review, no per-file edits.
+5. Mock rule [0.2]: every test double reproduces the signature of the installed `.d.ts`
+   (`snapshotEvents()`, `setup(agentCtx, agent)`, `open/read/close`, `handle.header`). Type the
+   doubles with the real interface so the typecheck rejects an incomplete mock.
+6. Final gate [U]: `npm run check` (architecture guard + typecheck + tests + build), then a clean `npm ci`
+   and a re-run of `npm run check`.
+7. Runtime proof [U] — NOT COVERED by the build, mandatory:
+   a. test profile `--from-default-profile web` (no competing experimental bundle),
+   b. `dsh plugin --profile {{PROFIL_TEST}} add link:{{ABS_PATH}}` + `--dump-config` (load gate),
+   c. boot `dsh {{PROFIL_TEST}} --no-open --port {{PORT}}`, client registration in the log,
+   d. API probes: body `{requestId, method, payload}`, ids under `{ id }`; read
+      `src/transport/contracts.ts` before writing a probe (e.g. `workbench.conversations`),
+   e. 2-member team + message + `lastActiveAt`; mid-turn stop; inter-agent messages,
+   f. server restart → projection of PERSISTED sessions (cold resume),
+   g. streaming via the local OpenAI stub: growing live node then the durable node; non-zero `usage`.
+   Use the integration script if it exists; otherwise write it in
+   `docs/engineering/tooling/` and reuse it.
+8. Deliverable [U]: sliced conventional commits (deps / runtime / client / tests), PR to
+   {{REMOTE_UPSTREAM}}: base, head SHA, what migrated (before → after), what is proven at
+   runtime, known limits.
 
-RÉDUCTION DES APPELS D'OUTILS (cible : < 250 appels d'outils, < 40 pour l'investigation)
-- Une seule investigation d'API, en parallèle, sortie STRUCTURÉE COURTE (liste de paires
-  avant → après). Pas de rédaction de design doc.
-- Ne pas relire un fichier déjà lu : relire un contrat avant d'écrire un client, une fois.
-- Ne pas explorer le CLI : `--help` une fois, puis utiliser les formes de ce brief.
-- Bash : pas de pipeline sur un gate, `&&` max 2 segments, une commande de gate par appel.
-- Artefacts intermédiaires dans `.scratch/` (sorties tsc, dumps de config, réponses de sondes) :
-  ils évitent de relire les sources et de rejouer les commandes.
-- Notes de travail continues dans `.dsh-notes.md` (SHA, décisions, faits vérifiés, reste) :
-  c'est la défense contre la compaction, pas un livrable.
+TOOL-CALL REDUCTION (target: < 250 tool calls, < 40 for investigation)
+- A single API investigation, in parallel, SHORT STRUCTURED output (a list of
+  before → after pairs). No design doc writing.
+- Do not re-read a file already read: re-read a contract before writing a client, once.
+- Do not explore the CLI: `--help` once, then use the forms in this brief.
+- Bash: no pipeline on a gate, `&&` max 2 segments, one gate command per call.
+- Intermediate artifacts in `.scratch/` (tsc outputs, config dumps, probe responses):
+  they avoid re-reading sources and replaying commands.
+- Continuous working notes in `.dsh-notes.md` (SHA, decisions, verified facts, what is left):
+  this is the defense against compaction, not a deliverable.
 
-CONDITIONS D'ARRÊT (arrêter, écrire, demander)
-- Baseline `npm run check` rouge sur la version source → arrêter, signaler.
-- Un symbole requis absent du runtime cible sans équivalent identifiable → arrêter la couche,
-  documenter l'impasse, proposer 2 options au PO.
-- Écriture hors workspace et hors ~/.dsh/profiles/{{PROFIL_TEST}} → ne pas escalader, demander.
-- Besoin d'un modèle réel (tour complet, coût) → demander l'autorisation avant, pas après.
-- Écart de plus de 2 jours de travail estimé entre le plan et l'avancement → rendre un état
-  partiel avec jalons, ne pas poursuivre en silence.
+STOP CONDITIONS (stop, write up, ask)
+- `npm run check` baseline red on the source version → stop, report it.
+- A required symbol missing from the target runtime with no identifiable equivalent → stop the layer,
+  document the dead end, propose 2 options to the PO.
+- Writing outside the workspace and outside ~/.dsh/profiles/{{PROFIL_TEST}} → do not escalate, ask.
+- Need for a real model (full turn, cost) → ask for authorization beforehand, not afterwards.
+- A gap of more than 2 estimated working days between the plan and progress → deliver a partial
+  state with milestones, do not continue in silence.
 
-CRITÈRES D'ACCEPTATION (tous prouvés par une sortie citée dans le rapport)
-- `npm run check` vert, `npm ci` vert depuis un arbre propre, SHA de la branche et de la base cités.
-- Table avant → après de chaque API migrée, avec la source (chemin du `.d.ts` ou fichier du runtime).
-- Preuves d'exécution : chargement du plugin, boot, création + démarrage d'équipe, message `delivered`,
-  reprise à froid, messages inter-agents, streaming (live + durable), permissions du preset.
-- Rollback décrit (commandes) et profil de test isolé du profil de production.
-- Aucune hypothèse présentée comme une preuve : marquer VERIFIÉ / INFÉRÉ / INCONNU.
+ACCEPTANCE CRITERIA (all proven by output quoted in the report)
+- `npm run check` green, `npm ci` green from a clean tree, branch and base SHA quoted.
+- Before → after table for every migrated API, with the source (`.d.ts` path or runtime file).
+- Runtime proofs: plugin load, boot, team create + start, `delivered` message,
+  cold resume, inter-agent messages, streaming (live + durable), preset permissions.
+- Rollback described (commands) and test profile isolated from the production profile.
+- No assumption presented as proof: mark VERIFIED / INFERRED / UNKNOWN.
 
-RAPPORT FINAL (format imposé, sans prose supplémentaire)
-1. SHA base / head, nombre de commits, taille du diff (avec et sans lockfile).
-2. Table API migrée (avant → après → source → preuve).
-3. Preuves d'exécution (commande → observation).
-4. Limites, comportements volontairement non migrés (`@deprecated` acceptés), risques résiduels.
-5. Ce qui a coûté du temps et la prévention (3 lignes).
+FINAL REPORT (imposed format, no extra prose)
+1. Base / head SHA, number of commits, diff size (with and without lockfile).
+2. Migrated API table (before → after → source → proof).
+3. Runtime proofs (command → observation).
+4. Limits, behaviors deliberately not migrated (`@deprecated` accepted), residual risks.
+5. What cost time and the prevention (3 lines).
 ```
 
-## Ce qui est universel vs propre à 0.1 → 0.2
+## What is universal vs specific to 0.1 → 0.2
 
-| Section du brief | Portée |
+| Brief section | Scope |
 | --- | --- |
-| Préflight, hygiène des gates, périmètres d'approbation, artefacts `.scratch/`, notes anti-compaction, conditions d'arrêt, format de rapport | **[U] universel** |
-| Gate de compatibilité sémantique multi-peers, `snapshotEvents`, `setup(agentCtx, agent)`, `acquireScope`, pont cordis, `assistant/chunk`, icônes, `directoryPicker` | **[0.2]** à réécrire pour chaque cible |
+| Preflight, gate hygiene, approval scopes, `.scratch/` artifacts, anti-compaction notes, stop conditions, report format | **[U] universal** |
+| Multi-peer semantic compatibility gate, `snapshotEvents`, `setup(agentCtx, agent)`, `acquireScope`, cordis bridge, `assistant/chunk`, icons, `directoryPicker` | **[0.2]** rewrite for each target |
 
-## Ce qui a été retiré du brief original (et pourquoi)
+## What was removed from the original brief (and why)
 
-| Retiré | Motif mesuré |
+| Removed | Measured reason |
 | --- | --- |
-| Description du produit, de l'architecture, du processus d'archive de session | lu dans le dépôt en 2 lectures ; non utilisé |
-| Exigence de documentation d'architecture avant le code | a produit un design doc non relu ; le recensement tsc fait le plan |
-| Contexte sur les dépôts de référence et docs de handoff | chemins inexistants dans le dépôt (coût : 33k tokens lus) |
-| Listes d'APIs à vérifier « à la main » | remplacées par la sonde de surface (§2) et le recensement tsc |
-| Recommandations UI détaillées | 53 renommages d'icônes : la règle « lot scripté + vérification du diff » suffit |
+| Product, architecture and session-archive process description | read from the repo in 2 reads; not used |
+| Requirement for architecture documentation before code | produced a design doc nobody read; the tsc census makes the plan |
+| Context on reference repos and handoff docs | paths that do not exist in the repo (cost: 33k tokens read) |
+| API lists to check "by hand" | replaced by the surface probe (§2) and the tsc census |
+| Detailed UI recommendations | 53 icon renames: the "scripted batch + diff review" rule is enough |

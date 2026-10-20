@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-// Mesures d'exécution à partir des journaux de session DSH v4 (lecture seule, zéro dépendance).
+// Runtime measurements built from DSH v4 session logs (read-only, zero dependencies).
 //
 //   node dsh-session-metrics.mjs [--sessions <dir>] [--file <jsonl.zstd>]
-//        [--from <ISO>] [--to <ISO>] [--exclude <fragments,csv>] [--label <texte>]...
+//        [--from <ISO>] [--to <ISO>] [--exclude <fragments,csv>] [--label <text>]...
 //
-// Sortie JSON : span, tours/steps/appels LLM, tokens (entrée, sortie, cache), appels d'outils par
-// outil, échecs d'outils, sorties bash non nulles (réels vs sans marqueur d'erreur), composition
-// des commandes bash (piped/chained/plain), temps d'outil cumulé et par catégorie, signatures de
-// commandes (nb d'appels, premier, premier succès, timeline), relectures répétées, approbations,
-// compactions, gaps humains > 60 s, agrégat par session.
+// JSON output: span, turns/steps/LLM calls, tokens (input, output, cache), tool calls per tool,
+// tool failures, non-zero bash exits (real vs with no error marker), bash command composition
+// (piped/chained/plain), cumulative tool time and per category, command signatures (call count,
+// first, first success, timeline), repeated re-reads, approvals, compactions, human gaps > 60 s,
+// per-session aggregate.
 //
-// Limites d'interprétation (documentées dans docs/engineering/DSH-MIGRATION-RETRO.md §2) :
-//  - le harness ne journalise pas de prix : le coût API n'est PAS déductible ;
-//  - une commande pipée ou chaînée ne publie que le code de sortie du dernier segment : le nombre
-//    de sorties non nulles est un majorant des échecs visibles, pas un décompte d'échecs ;
-//  - toolWallTime inclut les attentes d'approbation humaine ; les gaps > 60 s les isolent.
+// Interpretation limits (documented in docs/engineering/DSH-MIGRATION-RETRO.md §2):
+//  - the harness logs no price: the API cost is NOT derivable;
+//  - a piped or chained command only publishes the exit code of its last segment: the number of
+//    non-zero exits is an upper bound on visible failures, not a failure count;
+//  - toolWallTime includes waits for human approval; gaps > 60 s isolate them.
 //
-// Exemple (mission de migration) :
+// Example (migration mission):
 //   node docs/engineering/tooling/dsh-session-metrics.mjs \
 //     --from 2026-10-20T05:40:00Z --to 2026-10-20T10:50:00Z --exclude agent-team~ \
 //     --label "error TS" --label "npm ERR" > .scratch/metrics.json
