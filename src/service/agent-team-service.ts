@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Context, Service } from '@deepseek-ai/cordis'
+import type { DirectoryPicker } from '@deepseek-ai/dsh-host-directory-picker'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { isModelInvocable, isSkillName, isUserInvocable } from '@deepseek-ai/dsh-skill'
 import type { Config } from '../config.js'
@@ -238,20 +239,24 @@ export class AgentTeamService extends Service {
   async skillCatalog(agentPresetId: string): Promise<SkillCatalogSnapshot> {
     try {
       await this.ctx.agentPresets.resolve(agentPresetId)
-      const scope = await this.ctx.agentPresets.standingKeyFor(agentPresetId)
-      if (this.ctx.tools.get('skill', scope) === undefined) {
-        return { agentPresetId, skills: [] }
-      }
-      const skills = await this.ctx.skills.list({ scope })
-      return {
-        agentPresetId,
-        skills: skills.filter(skill => isModelInvocable(skill) || isUserInvocable(skill)).map(skill => ({
-          name: skill.name,
-          description: skill.description,
-          source: skill.source,
-          modelInvocable: isModelInvocable(skill),
-          userInvocable: isUserInvocable(skill),
-        })),
+      const scope = await this.ctx.agentPresets.acquireScope(agentPresetId)
+      try {
+        if (this.ctx.tools.get('skill', scope.key) === undefined) {
+          return { agentPresetId, skills: [] }
+        }
+        const skills = await this.ctx.skills.list({ scope: scope.key })
+        return {
+          agentPresetId,
+          skills: skills.filter(skill => isModelInvocable(skill) || isUserInvocable(skill)).map(skill => ({
+            name: skill.name,
+            description: skill.description,
+            source: skill.source,
+            modelInvocable: isModelInvocable(skill),
+            userInvocable: isUserInvocable(skill),
+          })),
+        }
+      } finally {
+        await scope[Symbol.asyncDispose]()
       }
     } catch (error) {
       if (error instanceof AgentTeamError) throw error
@@ -267,14 +272,18 @@ export class AgentTeamService extends Service {
   async mcpCatalog(agentPresetId: string): Promise<McpCatalogSnapshot> {
     try {
       await this.ctx.agentPresets.resolve(agentPresetId)
-      const scope = await this.ctx.agentPresets.standingKeyFor(agentPresetId)
+      const scope = await this.ctx.agentPresets.acquireScope(agentPresetId)
       const servers = new Map<string, Array<{ name: string; description: string }>>()
-      for (const tool of this.ctx.tools.schemas(scope)) {
-        const serverName = mcpServerFromToolName(tool.name)
-        if (serverName === undefined) continue
-        const entries = servers.get(serverName) ?? []
-        entries.push({ name: tool.name, description: tool.description })
-        servers.set(serverName, entries)
+      try {
+        for (const tool of this.ctx.tools.schemas(scope.key)) {
+          const serverName = mcpServerFromToolName(tool.name)
+          if (serverName === undefined) continue
+          const entries = servers.get(serverName) ?? []
+          entries.push({ name: tool.name, description: tool.description })
+          servers.set(serverName, entries)
+        }
+      } finally {
+        await scope[Symbol.asyncDispose]()
       }
       return {
         agentPresetId,
@@ -770,6 +779,29 @@ export class AgentTeamService extends Service {
       assistantBuilderConversation: conversation,
     }
     for (const listener of this.listeners) listener(change)
+  }
+
+  /**
+   * Ask the Host's directory picker for one absolute directory.
+   *
+   * Harness 0.2.0 exposes picking as a capability seam: a `native` backend
+   * opens the OS chooser on the host display, a `browse` backend serves
+   * in-app listing primitives a browser drives. Only the native shape answers
+   * a one-shot request, so every other backend is reported as unsupported.
+   * @returns the chosen absolute path, or null when the operator cancelled.
+   * @throws AgentTeamError when the Host offers no native chooser.
+   */
+  async pickWorkspaceDirectory(): Promise<{ path: string | null }> {
+    const picker: DirectoryPicker | undefined = this.ctx.directoryPicker
+    const capability = picker?.capability()
+    if (capability === undefined || capability.kind !== 'native') {
+      throw new AgentTeamError(
+        'INVALID_REQUEST',
+        '当前 Harness 宿主未提供本机目录选择器，请手动输入工作目录',
+      )
+    }
+    const path = await capability.pick(new AbortController().signal)
+    return { path }
   }
 
   async listWorkspace(teamId: string, rawPath = ''): Promise<WorkspaceEntryView[]> {

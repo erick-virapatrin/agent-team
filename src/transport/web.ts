@@ -426,6 +426,9 @@ async function dispatch(service: AgentTeamService, request: AgentTeamRequest): P
       }).strict().parse(request.payload)
       return service.getWorkspaceDiff(payload.teamId, payload.path, payload.scope, payload.layout, payload.theme)
     }
+    case 'workspace.pick': {
+      return service.pickWorkspaceDirectory()
+    }
     case 'team.dissolve': {
       const payload = z.object({ teamId: z.string().min(1), confirmation: z.string() }).strict().parse(request.payload)
       await service.dissolveTeam(payload.teamId, payload.confirmation, options)

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import { assembleContextFor, type AgentHandle } from '@deepseek-ai/dsh-agent'
+import { assembleContextFor, type Agent, type AgentHandle } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, type ContentBlock } from '@deepseek-ai/dsh-llm'
-import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Config } from '../config.js'
@@ -20,7 +20,8 @@ import type {
   AssistantBuilderDraftView,
   InteractionResponseInput,
 } from '../transport/contracts.js'
-import { projectConversation } from './conversation-projector.js'
+import { AssistantStreamTracker, projectConversation } from './conversation-projector.js'
+import { liveSessionEvents, readPersistedSessionEvents } from './session-log.js'
 import type { TeamInteractionBridge } from './team-interaction-bridge.js'
 
 export const ASSISTANT_BUILDER_SESSION_ID = 'agent-team:assistant-builder'
@@ -70,6 +71,8 @@ export class AssistantBuilderRuntime {
   private publishTimer: ReturnType<typeof setTimeout> | undefined
   private readonly disposeStatusListener: () => void
   private readonly disposeConversationListener: () => void
+  private readonly disposeStreamListener: () => void
+  private readonly streams = new AssistantStreamTracker()
   private readonly disposeInteractionScope: () => void
   private closing = false
 
@@ -91,22 +94,38 @@ export class AssistantBuilderRuntime {
       this.publishCurrent()
     })
     this.disposeConversationListener = ctx.on('session/event', session => {
-      if (String(session.id) !== this.activeSessionId || this.closing || this.publishTimer !== undefined) return
-      this.publishTimer = setTimeout(() => {
-        this.publishTimer = undefined
-        this.publishCurrent()
-      }, 48)
+      this.schedulePublish(String(session.id))
     })
+    this.disposeStreamListener = ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+      const sessionId = String(agent.id)
+      this.streams.observe(sessionId, frame)
+      if (frame.type === 'start') return
+      this.schedulePublish(sessionId)
+    })
+  }
+
+  /**
+   * Coalesce conversation publishes of the active Assistant Builder session.
+   * @param sessionId - the Session whose view is stale.
+   * @returns nothing.
+   */
+  private schedulePublish(sessionId: string): void {
+    if (sessionId !== this.activeSessionId || this.closing || this.publishTimer !== undefined) return
+    this.publishTimer = setTimeout(() => {
+      this.publishTimer = undefined
+      this.publishCurrent()
+    }, 48)
   }
 
   async listConversations(): Promise<AssistantBuilderConversationListView> {
     const headers = (await this.ctx.sessionPersistence.list())
+      .map(snapshot => snapshot.header)
       .filter(header => (
         isAssistantBuilderSessionId(String(header.id))
         && !this.isConversationArchived(String(header.id))
       ))
     const active = this.handle?.agent.session
-    const ids = new Map(headers.map(header => [String(header.id), header]))
+    const ids = new Map<string, SessionHeader>(headers.map(header => [String(header.id), header]))
     if (
       active !== undefined
       && isAssistantBuilderSessionId(String(active.id))
@@ -116,8 +135,8 @@ export class AssistantBuilderRuntime {
     }
     const summaries = await Promise.all([...ids.entries()].map(async ([sessionId, header]) => {
       const events = active !== undefined && String(active.id) === sessionId
-        ? active.events
-        : (await this.ctx.sessionPersistence.inspect(SessionId(sessionId))).events
+        ? liveSessionEvents(active)
+        : await readPersistedSessionEvents(this.ctx.sessionPersistence, SessionId(sessionId))
       return summarizeConversation(sessionId, header.createdAt, events)
     }))
     const items = summaries.filter(item => item.state !== 'new')
@@ -162,13 +181,13 @@ export class AssistantBuilderRuntime {
       source: { kind: 'user' },
     })
     handle.agent.followup(message)
-    return this.project(sessionId, handle.agent.session.events, handle.agent.status)
+    return this.project(sessionId, liveSessionEvents(handle.agent.session), handle.agent.status)
   }
 
   async getConversation(rawSessionId: string): Promise<AssistantBuilderConversationView> {
     const sessionId = await this.requireExistingSessionId(rawSessionId)
     const handle = await this.ensureOnline(sessionId)
-    return this.project(sessionId, handle.agent.session.events, handle.agent.status)
+    return this.project(sessionId, liveSessionEvents(handle.agent.session), handle.agent.status)
   }
 
   async sendMessage(sessionId: string, rawContent: string): Promise<{ messageId: string }> {
@@ -253,8 +272,10 @@ export class AssistantBuilderRuntime {
     this.closing = true
     this.disposeStatusListener()
     this.disposeConversationListener()
+    this.disposeStreamListener()
     this.disposeInteractionScope()
     if (this.publishTimer !== undefined) clearTimeout(this.publishTimer)
+    if (this.activeSessionId !== undefined) this.streams.clear(this.activeSessionId)
     this.publishTimer = undefined
     await this.reconfiguring?.catch(() => undefined)
     await this.switching?.catch(() => undefined)
@@ -379,11 +400,9 @@ export class AssistantBuilderRuntime {
         configuration.model,
       )
     }
-    const setup = async (agentCtx: Context): Promise<void> => {
+    const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
       await this.ctx.agentPresets.mount(agentCtx, configuration.agentPresetId)
       agentCtx.tools.presentAs('native')
-      const agent = agentCtx.agent
-      if (agent === undefined) throw new Error('Harness did not bind the unpublished Assistant Builder Agent')
       if (agent.session.header.cwd === undefined) {
         agentCtx.systemPrompt.variable('cwd', () => cwd)
       }
@@ -418,7 +437,7 @@ export class AssistantBuilderRuntime {
     }
     const agentOptions = { provider: configuration.provider, model: configuration.model }
     const persisted = (await this.ctx.sessionPersistence.list())
-      .some(header => String(header.id) === rawSessionId)
+      .some(snapshot => String(snapshot.header.id) === rawSessionId)
     if (!persisted && !allowCreate) {
       throw new AgentTeamError('INVALID_REQUEST', `Unknown Assistant Builder conversation '${rawSessionId}'`)
     }
@@ -541,7 +560,7 @@ export class AssistantBuilderRuntime {
     }
     if (sessionId === this.activeSessionId) return sessionId
     const exists = (await this.ctx.sessionPersistence.list())
-      .some(header => String(header.id) === sessionId)
+      .some(snapshot => String(snapshot.header.id) === sessionId)
     if (!exists) {
       throw new AgentTeamError('INVALID_REQUEST', `Unknown Assistant Builder conversation '${sessionId}'`)
     }
@@ -668,7 +687,7 @@ export class AssistantBuilderRuntime {
         })
         this.pendingDrafts.set(sessionId, {
           input,
-          preparedThroughSeq: exec.agent.session.events.at(-1)?.seq ?? -1,
+          preparedThroughSeq: liveSessionEvents(exec.agent.session).at(-1)?.seq ?? -1,
         })
         return {
           name: input.name,
@@ -705,7 +724,7 @@ export class AssistantBuilderRuntime {
           )
         }
         if (!hasFreshAssistantDraftUserResponse(
-          exec.agent.session.events,
+          liveSessionEvents(exec.agent.session),
           pending.preparedThroughSeq,
         )) {
           throw new AgentTeamError(
@@ -737,7 +756,7 @@ export class AssistantBuilderRuntime {
       sessionId,
       status,
       pendingInteractions: this.interactions.list(sessionId),
-      ...projectConversation(events),
+      ...projectConversation(events, 240, undefined, this.streams.list(sessionId)),
       configuration: this.configuration,
     }
   }
@@ -747,7 +766,7 @@ export class AssistantBuilderRuntime {
     const sessionId = this.activeSessionId
     if (handle === undefined || sessionId === undefined || this.configuration === undefined || this.closing) return
     this.service.publishAssistantBuilderConversation(
-      this.project(sessionId, handle.agent.session.events, handle.agent.status),
+      this.project(sessionId, liveSessionEvents(handle.agent.session), handle.agent.status),
     )
   }
 }

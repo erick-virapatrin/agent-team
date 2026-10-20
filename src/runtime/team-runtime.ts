@@ -26,7 +26,7 @@ import type {
   MemberConversationView,
   TeamWorkbenchView,
 } from '../transport/contracts.js'
-import { projectContextUsage, projectConversation } from './conversation-projector.js'
+import { AssistantStreamTracker, projectContextUsage, projectConversation } from './conversation-projector.js'
 import { registerScopedSkillProvider } from './scoped-skills.js'
 import { TeamCommandHandler } from './team-command-handler.js'
 import { TeamInteractionBridge } from './team-interaction-bridge.js'
@@ -36,6 +36,7 @@ import {
   createTeamMessage as teamMessage,
   requireMessageContent as requireContent,
 } from './team-messages.js'
+import { liveSessionEvents, readPersistedSessionEvents } from './session-log.js'
 import { memberPrompt, rosterPrompt } from './team-prompts.js'
 import { registerTeamTools } from './team-tools.js'
 
@@ -52,6 +53,8 @@ export class TeamRuntime {
   private readonly operations = new Map<string, Promise<unknown>>()
   private readonly disposeStatusListener: () => void
   private readonly disposeConversationListener: () => void
+  private readonly disposeStreamListener: () => void
+  private readonly streams = new AssistantStreamTracker()
   private readonly conversationPublishes = new Map<string, ReturnType<typeof setTimeout>>()
   private readonly messages: TeamMessageDispatcher
   private readonly commands: TeamCommandHandler
@@ -82,18 +85,32 @@ export class TeamRuntime {
         .catch(error => this.ctx.logger.warn('agent-team: failed to persist agent status', error))
     })
     this.disposeConversationListener = ctx.on('session/event', (session) => {
-      const owned = this.owned.get(String(session.id))
-      if (owned === undefined || this.conversationPublishes.has(String(session.id))) return
-      const timer = setTimeout(() => {
-        this.conversationPublishes.delete(String(session.id))
-        try {
-          this.publishOwnedConversation(String(session.id))
-        } catch (error) {
-          this.ctx.logger.warn('agent-team: failed to publish conversation update', error)
-        }
-      }, 48)
-      this.conversationPublishes.set(String(session.id), timer)
+      this.scheduleConversationPublish(String(session.id))
     })
+    this.disposeStreamListener = ctx.on('agent/assistant-stream', ({ agent, frame }) => {
+      const sessionId = String(agent.id)
+      this.streams.observe(sessionId, frame)
+      if (frame.type === 'start') return
+      this.scheduleConversationPublish(sessionId)
+    })
+  }
+
+  /**
+   * Coalesce conversation publishes of one Session into a single recent update.
+   * @param sessionId - the Session whose view is stale.
+   * @returns nothing.
+   */
+  private scheduleConversationPublish(sessionId: string): void {
+    if (!this.owned.has(sessionId) || this.conversationPublishes.has(sessionId)) return
+    const timer = setTimeout(() => {
+      this.conversationPublishes.delete(sessionId)
+      try {
+        this.publishOwnedConversation(sessionId)
+      } catch (error) {
+        this.ctx.logger.warn('agent-team: failed to publish conversation update', error)
+      }
+    }, 48)
+    this.conversationPublishes.set(sessionId, timer)
   }
 
   startInteractionBridge(): void {
@@ -108,10 +125,15 @@ export class TeamRuntime {
     const team = this.service.getTeam(teamId)
     const conversations = await Promise.all(Object.values(team.members).map(async member => {
       const owned = this.owned.get(member.sessionId)
-      let events = owned?.handle.agent.session.events
+      let events: readonly SessionEvent[] | undefined = owned === undefined
+        ? undefined
+        : liveSessionEvents(owned.handle.agent.session)
       if (events === undefined) {
         try {
-          events = (await this.ctx.sessionPersistence.inspect(SessionId(member.sessionId))).events
+          events = await readPersistedSessionEvents(
+            this.ctx.sessionPersistence,
+            SessionId(member.sessionId),
+          )
         } catch {
           events = []
         }
@@ -141,7 +163,7 @@ export class TeamRuntime {
       this.service.publishConversation(
         teamId,
         current.revision,
-        this.projectMemberConversation(current, currentMember, owned.handle.agent.session.events),
+        this.projectMemberConversation(current, currentMember, liveSessionEvents(owned.handle.agent.session)),
       )
     }
   }
@@ -256,7 +278,7 @@ export class TeamRuntime {
       ...projectConversation(events, 240, {
         team,
         messages: this.service.listMessages(team.id).items,
-      }),
+      }, this.streams.list(member.sessionId)),
       ...(contextUsage === undefined ? {} : { contextUsage }),
     }
   }
@@ -270,7 +292,7 @@ export class TeamRuntime {
       const team = this.service.getTeam(teamId)
       const member = team.members[slotId]
       if (member === undefined) throw new AgentTeamError('MEMBER_NOT_FOUND', `Unknown member '${slotId}'`)
-      const materialized = new Set((await this.ctx.sessionPersistence.list()).map(header => String(header.id)))
+      const materialized = new Set((await this.ctx.sessionPersistence.list()).map(snapshot => String(snapshot.header.id)))
       try {
         await this.ensureMemberOnline(team, member, materialized.has(member.sessionId))
         const current = this.service.getTeam(teamId)
@@ -627,9 +649,11 @@ export class TeamRuntime {
     this.closing = true
     this.disposeStatusListener()
     this.disposeConversationListener()
+    this.disposeStreamListener()
     await this.interactions.dispose()
     for (const timer of this.conversationPublishes.values()) clearTimeout(timer)
     this.conversationPublishes.clear()
+    for (const sessionId of this.owned.keys()) this.streams.clear(sessionId)
     await Promise.allSettled([...this.operations.values()])
     const owned = [...this.owned.values()]
     for (const entry of owned) entry.handle.agent.cancel({ kind: 'disposed' }, { keepInbox: true })
@@ -655,7 +679,7 @@ export class TeamRuntime {
       this.service.publishConversation(
         team.id,
         team.revision,
-        this.projectMemberConversation(team, member, owned.handle.agent.session.events),
+        this.projectMemberConversation(team, member, liveSessionEvents(owned.handle.agent.session)),
       )
     } catch (error) {
       this.ctx.logger.warn('agent-team: failed to publish interaction update', error)
@@ -701,11 +725,31 @@ export class TeamRuntime {
     if (workspace === undefined || await workspace.status() !== 'ok' || workspace.path !== team.workspacePath) {
       throw new AgentTeamError('WORKSPACE_UNAVAILABLE', `Workspace '${team.workspaceId}' is unavailable or changed`)
     }
-    const materialized = new Set((await this.ctx.sessionPersistence.list()).map(header => String(header.id)))
+    const materialized = new Set((await this.ctx.sessionPersistence.list()).map(snapshot => String(snapshot.header.id)))
     await mapConcurrent(Object.values(team.members), this.config.runtimeConcurrency, async member => {
       if (member.desiredState === 'removing') return
       await this.ensureMemberOnline(team, member, materialized.has(member.sessionId))
     })
+  }
+
+  /**
+   * Read the skills inherited from one Agent Preset through a short-lived scope lease.
+   * @param presetId - the preset whose standing mount is read; undefined reads the default.
+   * @param cwd - project root for project-scoped skills.
+   * @param signal - cancellation for discovery.
+   * @returns every skill the preset layer contributes.
+   */
+  private async listPresetSkills(
+    presetId: string | undefined,
+    cwd: string | undefined,
+    signal?: AbortSignal,
+  ): Promise<Awaited<ReturnType<Context['skills']['list']>>> {
+    const scope = await this.ctx.agentPresets.acquireScope(presetId)
+    try {
+      return await this.ctx.skills.list({ cwd, signal, scope: scope.key })
+    } finally {
+      await scope[Symbol.asyncDispose]()
+    }
   }
 
   private async ensureMemberOnline(
@@ -742,7 +786,7 @@ export class TeamRuntime {
         },
         assembled: undefined,
       }
-      const setup = async (agentCtx: Context): Promise<void> => {
+      const setup = async (agentCtx: Context, agent: Agent): Promise<void> => {
         await this.ctx.agentPresets.mount(agentCtx, member.assistantSnapshot.agentPresetId)
         installModelSelection(agentCtx, modelSelection)
         const identitySection = `agent-team:identity:${member.id}`
@@ -776,8 +820,6 @@ export class TeamRuntime {
             this.commands.sendMemberMessage(team.id, member.id, recipientSlotId, content, type)
           ),
         })
-        const agent = agentCtx.agent
-        if (agent === undefined) throw new Error('Harness did not bind the unpublished agent context')
         const selectedMcpServers = new Set(member.assistantSnapshot.mcpServers)
         const mcpTools = agentCtx.tools.schemas(agent).flatMap(tool => {
           const serverName = mcpServerFromToolName(tool.name)
@@ -826,18 +868,15 @@ export class TeamRuntime {
             { memberId: member.id },
           )
         }
-        const presetScope = await this.ctx.agentPresets.standingKeyFor(
-          member.assistantSnapshot.agentPresetId,
-        )
         const skillSelectionProvider = `agent-team-selection-${member.id}`
         await registerScopedSkillProvider(agentCtx, () => ({
           name: skillSelectionProvider,
           list: async options => {
-            const inherited = await this.ctx.skills.list({
-              cwd: options.cwd,
-              signal: options.signal,
-              scope: presetScope,
-            })
+            const inherited = await this.listPresetSkills(
+              member.assistantSnapshot.agentPresetId,
+              options.cwd,
+              options.signal,
+            )
             return inherited.filter(skill => !selectedSkills.has(skill.name)).map(skill => ({
               name: skill.name,
               description: skill.description,

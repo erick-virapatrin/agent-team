@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-agent-presets'
-import type {} from '@deepseek-ai/dsh-host-apiproxy'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
+import type {} from '@deepseek-ai/dsh-host-directory-picker'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-permission-presets'
@@ -10,8 +10,11 @@ import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import type {} from '@deepseek-ai/dsh-user-approval'
+import type {} from '@deepseek-ai/dsh-user-questions'
 import type {} from '@deepseek-ai/dsh-workspace'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from './domain/message-source.js'
 import { Config, type Config as AgentTeamConfig } from './config.js'
 import { AgentTeamService } from './service/agent-team-service.js'
 import { AssistantBuilderRuntime } from './runtime/assistant-builder-runtime.js'
@@ -28,7 +31,7 @@ export const name = 'agent-team'
 export const inject = [
   'agents',
   'agentPresets',
-  'apiProxy',
+  'approval',
   'llm',
   'permissionPresets',
   'sessionPersistence',
@@ -37,6 +40,7 @@ export const inject = [
   'storageDomain',
   'systemPrompt',
   'tools',
+  'userQuestions',
   'webServer',
   'workspaceRegistry',
 ]

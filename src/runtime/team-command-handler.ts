@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createUserMessage, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { AgentTeamError } from '../domain/errors.js'
+import { AGENT_TEAM_MESSAGE_SOURCE } from '../domain/message-source.js'
 import type { AgentTeamService } from '../service/agent-team-service.js'
 import {
   assignmentContent,
@@ -184,11 +185,7 @@ export class TeamCommandHandler {
     const content = requireMessageContent(rawContent)
     const relay = createUserMessage({
       content: [{ type: 'text', text: `${teamMessageHeader(sender.displayName, sender.id)}\n${content}` }],
-      source: {
-        kind: 'plugin',
-        plugin: 'dsh-agent-team',
-        form: 'relay',
-      },
+      source: AGENT_TEAM_MESSAGE_SOURCE,
     })
     const record = createTeamMessage({
       id: String(relay.id),
