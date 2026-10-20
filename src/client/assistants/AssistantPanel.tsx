@@ -2,10 +2,10 @@ import type { FormEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Button,
-  IconArchiveOutline20,
-  IconPlusOutline16,
-  IconSendOutline16,
-  IconStopFill16,
+  IconArchiveOutlineRegular,
+  IconPlusOutlineRegular,
+  IconSendOutlineRegular,
+  IconStopFillRegular,
   MarkdownText,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -24,7 +24,7 @@ import css from '../AgentTeam.module.css'
 import { shouldSubmitComposer } from '../keyboard.js'
 import { PERMISSION_LABELS } from '../labels.js'
 import { defaultReasoningLabel, useModelCapabilities } from '../model-reasoning.js'
-import { AnimatedModal, Empty, Field } from '../shared.js'
+import { AnimatedModal, Empty, Field, MARKDOWN_LABELS } from '../shared.js'
 import { ConversationNodeView } from '../workbench/ConversationColumn.js'
 import { PendingInteractionCard } from '../workbench/PendingInteractionCard.js'
 import conversationCss from '../workbench/ConversationColumn.module.css'
@@ -412,7 +412,7 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
           disabled={loading || running || draft !== undefined}
           onClick={() => { void createDraft() }}
         >
-          <IconPlusOutline16 size={14} />
+          <IconPlusOutlineRegular size={14} />
           <span>新对话</span>
         </button>
         <div className={css.assistantBuilderHistoryList}>
@@ -441,7 +441,7 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
                     setArchiveCandidate(item)
                   }}
                 >
-                  <IconArchiveOutline20 size={14} />
+                  <IconArchiveOutlineRegular size={14} />
                 </button>
               </Tooltip>
             </div>
@@ -495,7 +495,10 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
         {!loading && (draft !== undefined || conversation?.nodes.length === 0) && (
           <article className={`${conversationCss.messageNode} ${conversationCss.assistantMessage}`}>
             <div className={conversationCss.messageText}>
-              <MarkdownText text="你好，我是团队 Agent 小助手。告诉我你想创建什么样的助手，以及它主要负责什么；缺少的配置我会逐项询问你。" />
+              <MarkdownText
+                text="你好，我是团队 Agent 小助手。告诉我你想创建什么样的助手，以及它主要负责什么；缺少的配置我会逐项询问你。"
+                labels={MARKDOWN_LABELS}
+              />
             </div>
           </article>
         )}
@@ -544,7 +547,7 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
             {running && (
               <Tooltip label="停止生成" side="top" delayMs={400}>
                 <button type="button" className={conversationCss.composerIconButton} onClick={() => { void stop() }} aria-label="停止生成">
-                  <IconStopFill16 size={16} />
+                  <IconStopFillRegular size={16} />
                 </button>
               </Tooltip>
             )}
@@ -555,7 +558,7 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
                 disabled={loading || running || sending || !selectedProvider || !selectedModel || content.trim().length === 0}
                 aria-label={sending ? '发送中' : '发送消息'}
               >
-                <IconSendOutline16 size={16} />
+                <IconSendOutlineRegular size={16} />
               </button>
             </Tooltip>
           </div>
@@ -601,7 +604,7 @@ function AssistantBuilderConversation({ catalog }: { catalog: CatalogView | unde
         {archiveCandidate !== undefined && (
           <div className={css.assistantBuilderArchiveConfirm}>
             <div className={css.assistantBuilderArchiveIcon} aria-hidden="true">
-              <IconArchiveOutline20 size={20} />
+              <IconArchiveOutlineRegular size={20} />
             </div>
             <div>
               <strong>{archiveCandidate.title}</strong>
