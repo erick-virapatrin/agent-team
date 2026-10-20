@@ -13,7 +13,7 @@ Go to **Settings → Agent Team**.
 Each assistant card shows the model, Preset, default permission, reasoning mode, Skills, MCP Servers and the role description. The available actions are:
 
 - **Edit**: change the template configuration.
-- **Duplicate**: create a new assistant from the current configuration.
+- **Copy**: create a new assistant from the current configuration.
 - **Delete**: delete an assistant that no team member references.
 
 ## Method 1: the built-in assistant builder

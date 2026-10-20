@@ -12,8 +12,8 @@ After a team is created it opens in the full-screen Workbench. Switch teams on t
 - The Leader is marked with a crown.
 - The status dot reflects the Idle, Running, Waiting, Error or Offline state.
 - Hovering a tab that is not the Leader lets you remove that member directly.
-- **Add Assistant** opens the reusable assistant picker.
-- **Team Management** opens member and team lifecycle management.
+- **Add assistant** opens the reusable assistant picker.
+- **Team management** opens member and team lifecycle management.
 
 Hiding a conversation column does not stop the member and does not clear its context.
 

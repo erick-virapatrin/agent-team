@@ -123,4 +123,4 @@ Open an issue on [GitHub Issues](https://github.com/limuyang2/agent-team/issues)
 - The Provider and model names (do not submit API keys).
 - The steps that reproduce the problem.
 - Harness terminal errors and UI screenshots.
-- Whether a refresh or a restart recovers the behaviour.
+- Whether a refresh or a restart recovers the behavior.

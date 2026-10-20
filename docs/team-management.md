@@ -2,11 +2,11 @@
 
 [Previous: Workspace](./workspace.md) · [Documentation Home](./README.md) · [Next: Troubleshooting](./troubleshooting.md)
 
-Click **Team Management** at the top of the Workbench to manage members, the Leader, contexts, and the team lifecycle.
+Click **Team management** at the top of the Workbench to manage members, the Leader, contexts, and the team lifecycle.
 
 ## Add Members
 
-Clicking **Add Member** opens the assistant list dialog:
+Clicking **Add assistant** opens the assistant list dialog:
 
 1. Select an assistant.
 2. The system creates a new member snapshot from the assistant's current configuration.

@@ -42,7 +42,7 @@ When **Allow the user to chat directly with regular members** is checked, the us
 
 ## Create and Auto-Start
 
-After you click **Create and Start**, the plugin:
+After you click **Create and start**, the plugin:
 
 1. Creates an independent Session for each selected member.
 2. Associates all Sessions with the same Workspace.

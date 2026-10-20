@@ -30,7 +30,7 @@ When the Workspace is a Git repository, the **Changes** tab groups files by cate
 - Modified files.
 - Untracked files.
 
-Each state has its own colour and status code. Click a file to open a read-only Diff preview of the added, deleted and modified content.
+Each state has its own color and status code. Click a file to open a read-only Diff preview of the added, deleted and modified content.
 
 ## Non-Git Workspace
 
