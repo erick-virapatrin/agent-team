@@ -1,67 +1,67 @@
-# Workspace 与 Git 变更
+# Workspace and Git Changes
 
-[上一篇：工作台与协作](./workbench.md) · [文档首页](./README.md) · [下一篇：团队管理](./team-management.md)
+[Previous: Workbench and Collaboration](./workbench.md) · [Documentation Home](./README.md) · [Next: Team Management](./team-management.md)
 
-团队所有成员共享一个 Workspace。不同成员可以使用不同权限，但看到的是同一份目录和文件变化。
+All members of a team share one Workspace. Members can use different permissions, but they all see the same directory and the same file changes.
 
-## 展开和收起
+## Expanding and collapsing
 
-工作台右上角的 **Workspace** 按钮用于展开面板。面板打开后，可点击收起图标释放更多对话空间。
+The **Workspace** button in the top-right of the Workbench expands the panel. Once it is open, click the collapse icon to free up more conversation space.
 
-展开或收起只改变界面布局，不影响成员访问 Workspace。
+Expanding and collapsing only changes the layout; it does not affect member access to the Workspace.
 
-## 文件页签
+## Files tab
 
-**文件** 页签以目录树展示 Workspace：
+The **Files** tab shows the Workspace as a directory tree:
 
-- 点击文件夹逐层展开。
-- 新文件和目录变化会自动刷新。
-- 右上角刷新图标可随时手动刷新。
-- 列表只展示 Workspace 范围内的安全路径。
+- Click a folder to expand it one level at a time.
+- New files and directory changes refresh automatically.
+- The refresh icon in the top-right re-reads on demand at any time.
+- The listing only shows safe paths inside the Workspace.
 
-为避免路径逃逸，插件会拒绝绝对路径、`..` 和通过符号链接离开 Workspace 的访问。
+To prevent path escapes, the plugin rejects absolute paths, `..`, and access that leaves the Workspace through a symbolic link.
 
-## 变更页签
+## Changes tab
 
-Workspace 是 Git 仓库时，**变更** 页签会分类展示：
+When the Workspace is a Git repository, the **Changes** tab groups files by category:
 
-- 冲突文件。
-- 已暂存文件。
-- 已修改文件。
-- 未跟踪文件。
+- Conflicting files.
+- Staged files.
+- Modified files.
+- Untracked files.
 
-不同状态使用颜色和状态码区分。点击文件可打开只读 Diff 预览，查看新增、删除和修改内容。
+Each state has its own colour and status code. Click a file to open a read-only Diff preview of the added, deleted and modified content.
 
-## 非 Git Workspace
+## Non-Git Workspace
 
-如果当前 Workspace 不是 Git 仓库，变更页签会明确提示。文件浏览仍然可用。
+If the current Workspace is not a Git repository, the Changes tab says so explicitly. File browsing is still available.
 
-注意：如果 Workspace 根目录不是仓库，但某个子目录是仓库，插件不会自动把子目录当作 Workspace 仓库。创建团队时应直接选择正确的仓库根目录。
+Note: if the Workspace root is not a repository but one of its subdirectories is, the plugin does not treat that subdirectory as the Workspace repository. Select the correct repository root when creating the team.
 
-## 自动刷新机制
+## How auto-refresh works
 
-插件在 Host 端跟踪 Workspace 文件变化，并通过团队事件连接刷新目录和 Git 状态。以下情况仍建议手动刷新：
+The plugin tracks Workspace file changes on the Host side and refreshes the directory and Git status over the team event connection. Refresh manually in these cases:
 
-- 外部工具一次生成大量文件。
-- 文件系统事件被操作系统合并。
-- 浏览器长时间休眠后恢复。
-- 网络断开后刚刚重连。
+- An external tool generates a large number of files at once.
+- The operating system coalesces file system events.
+- The browser resumes after a long sleep.
+- The network has just reconnected after a drop.
 
-## 从输入框选择文件
+## Choosing files from the input box
 
-浏览器无法把任意本地绝对路径安全地直接交给 Host Agent。因此，从输入框选择 Workspace 外文件时，插件会：
+A browser cannot safely hand an arbitrary local absolute path to a Host Agent. So when you pick a file that lives outside the Workspace in the input box, the plugin:
 
-1. 上传文件内容到团队 Workspace。
-2. 保存到 `.agent-team/uploads/`。
-3. 在消息中插入 Workspace 内路径。
+1. Uploads the file content into the team Workspace.
+2. Saves it under `.agent-team/uploads/`.
+3. Inserts the in-Workspace path into the message.
 
-删除附件后再次添加同一文件，会尽量复用可用名称；发生同名冲突时才会生成新的安全文件名。
+Deleting an attachment and adding the same file again reuses the available name where it can; a new safe file name is generated only when the names collide.
 
-## 多成员修改建议
+## Suggestions for multi-member edits
 
-多个成员可以同时修改同一 Workspace。为减少冲突：
+Multiple members can modify the same Workspace at the same time. To reduce conflicts:
 
-- 让 Leader 按文件或模块拆分任务。
-- 在任务说明中写清负责文件范围。
-- 修改共享核心文件前先通过团队消息协调。
-- 任务完成后让 Leader查看 Git Diff 并统一验收。
+- Have the Leader split tasks by file or by module.
+- State the owned file range clearly in the task description.
+- Coordinate through team messages before changing a shared core file.
+- After a task is done, have the Leader review the Git Diff and accept the work in one pass.

@@ -1,78 +1,78 @@
-# 团队管理
+# Team Management
 
-[上一篇：Workspace](./workspace.md) · [文档首页](./README.md) · [下一篇：故障排查](./troubleshooting.md)
+[Previous: Workspace](./workspace.md) · [Documentation Home](./README.md) · [Next: Troubleshooting](./troubleshooting.md)
 
-点击工作台顶部的 **团队管理**，可以管理成员、Leader、上下文和团队生命周期。
+Click **Team Management** at the top of the Workbench to manage members, the Leader, contexts, and the team lifecycle.
 
-## 添加成员
+## Add Members
 
-点击 **添加成员** 后，会打开助手列表弹窗：
+Clicking **Add Member** opens the assistant list dialog:
 
-1. 选择一个助手。
-2. 系统基于助手当前配置创建新的成员快照。
-3. 为成员创建独立 Session，并关联团队 Workspace。
-4. 新成员启动成功后自动加入工作台。
-5. Leader 收到包含成员名称、成员 ID、模型和就绪状态的通知。
+1. Select an assistant.
+2. The system creates a new member snapshot from the assistant's current configuration.
+3. It creates an independent Session for the member and associates it with the team Workspace.
+4. The new member joins the Workbench automatically once it starts successfully.
+5. The Leader receives a notification with the member name, member ID, model, and ready status.
 
-同一个助手可以重复添加，不需要设置别名。界面名称保持助手原名，系统使用稳定成员 ID 区分实例。
+You can add the same assistant repeatedly, with no alias to set. The interface keeps the assistant's original name, and the system uses stable member IDs to tell the instances apart.
 
-## 移出成员
+## Remove Members
 
-可以从成员卡片、顶部标签悬停操作或团队管理窗口移出普通成员。操作前会出现自定义警示弹窗。
+You can remove a regular member from its member card, from the hover actions on a top tab, or from the Team Management window. A custom warning dialog appears before the action.
 
-确认后：
+After you confirm:
 
-- 停止该成员正在运行的任务。
-- 归档并解除当前 Session。
-- 从团队活动成员中移除。
-- 通知 Leader 该成员已移出，并附带成员 ID。
-- Workspace 文件和该成员已经完成的产出保持不变。
+- The member's running tasks are stopped.
+- The current Session is archived and detached.
+- The member is removed from the team's active members.
+- The Leader is notified that the member was removed, along with the member ID.
+- The Workspace files and the work the member has already completed stay unchanged.
 
-Leader 不能直接移出。应先把 Leader 角色转交给其他成员。
+The Leader cannot be removed directly. Transfer the Leader role to another member first.
 
-## 更换 Leader
+## Change the Leader
 
-点击普通成员卡片上的 **设为 Leader**：
+Click **Set as Leader** on a regular member's card:
 
-- 原 Leader 变为普通成员。
-- 新 Leader 接收 Leader 角色和团队协调规则。
-- 两位成员都保留原来的 Session 和上下文。
-- 团队始终只有一个 Leader。
+- The former Leader becomes a regular member.
+- The new Leader takes on the Leader role and the team coordination rules.
+- Both members keep their existing Session and context.
+- The team always has exactly one Leader.
 
-## 清空任务与上下文
+## Clear Tasks and Context
 
-当上下文过长、任务需要完全重新开始，或团队状态混乱时使用。
+Use this when the context has grown too long, the work needs a complete restart, or the team state is in a mess.
 
-确认后会：
+After you confirm:
 
-- 停止所有成员。
-- 清空团队任务、待处理消息和文件租约状态。
-- 为每个保留成员创建全新 Session。
-- 保留成员列表、Leader、助手快照和运行配置。
-- 保留 Workspace 及其中的全部文件。
+- All members stop.
+- Team tasks, pending messages, and file lease state are cleared.
+- A brand-new Session is created for each member that is kept.
+- The member list, the Leader, the assistant snapshots, and the runtime configuration are kept.
+- The Workspace and all of its files are kept.
 
-这不是“撤销文件修改”，也不会回滚 Git 变更。需要回滚文件时，请使用 Git 或其他版本管理工具。
+This does not "undo file modifications" and does not roll back Git changes. Use Git or another version control tool when you need to roll files back.
 
-## 解散团队
+## Disband the Team
 
-解散是不可恢复的团队领域删除操作，确认弹窗不要求输入团队名称。
+Disbanding is an irreversible delete in the team domain, and the confirmation dialog does not require you to type the team name.
 
-| 会删除 | 会保留 |
+| Deleted | Kept |
 | --- | --- |
-| 团队配置 | 助手模板 |
-| 团队任务 | Workspace 文件 |
-| 团队消息和活动记录 | Provider、模型、Skills 和 MCP 配置 |
-| 插件对旧 Session 的恢复关系 | Harness 底层可能保留的 Session 日志 |
+| Team configuration | Assistant templates |
+| Team tasks | Workspace files |
+| Team messages and activity records | Provider, model, Skills, and MCP configuration |
+| The plugin's restore links to the old Sessions | Session logs that Harness may keep at the lower layer |
 
-解散后，该团队会从左侧列表消失，助手仍可用于创建其他团队。
+After disbanding, the team disappears from the list on the left, and the assistants remain available for creating other teams.
 
-## 为什么没有暂停团队
+## Why There Is No Pause for a Team
 
-团队本身是成员和协作关系，不是一个持续运行的单进程。成员空闲时不会执行任务，因此“暂停团队”没有明确价值。
+A team is a set of members and their collaboration, not a single continuously running process. Members execute no tasks while idle, so "pausing the team" has no clear value.
 
-需要停止时可以：
+When you need to stop work you can:
 
-- 停止某个成员当前输出。
-- 清空全部任务与上下文。
-- 移出不再需要的成员。
-- 解散整个团队。
+- Stop the current output of one member.
+- Clear all tasks and contexts.
+- Remove members that are no longer needed.
+- Disband the whole team.

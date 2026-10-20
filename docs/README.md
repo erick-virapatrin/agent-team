@@ -1,86 +1,86 @@
-# Agent Team 用户手册
+# Agent Team User Manual
 
-[返回中文首页](../README_CN.md) · [English README](../README.md)
+[Back to the Chinese home page](../README_CN.md) · [English README](../README.md)
 
-Agent Team 是 DeepSeek Harness Web 插件，用于把多个平级、独立的 AI Agent 组建为团队。每位成员拥有自己的模型、Session、上下文和工具调用，同时共享一个 Workspace，并通过团队任务与消息协作。
+Agent Team is a DeepSeek Harness Web plugin that assembles multiple peer-level, independent AI Agents into a team. Every member has its own model, Session, context, and tool calls, while sharing a single Workspace and collaborating through team tasks and messages.
 
-![多成员团队工作台](../demo/4.png)
+![Multi-member team workbench](../demo/4.png)
 
-## 与常见 Subagent 工作流的区别
+## How This Differs from a Typical Subagent Workflow
 
-Agent Team 不把团队成员实现为 Leader 的临时子 Agent，而是为每个职责创建独立的根级 Agent。这样做的目标不是单纯增加 Agent 数量，而是把模型、工具、权限和上下文按专业职责拆开。
+Agent Team does not implement team members as temporary subagents of the Leader. It creates an independent root-level Agent for each responsibility. The goal is not simply to have more Agents, but to split models, tools, permissions, and context along specialized roles.
 
-| 能力 | 带来的价值 |
+| Capability | What it gives you |
 | --- | --- |
-| 每个成员独立模型 | 复杂规划使用高能力模型，编码、测试、提交信息等任务使用更适合或成本更低的模型 |
-| 每个成员独立 Skills / MCP | 避免一个 Agent 同时加载大量无关能力，减少工具选择噪音和提示负担 |
-| 每个成员独立上下文 | 执行细节留在执行成员中，Leader 只接收进度与结果，缓解单 Agent 上下文膨胀 |
-| 每个成员独立权限 | 评审成员可以只读，编码成员只获得 Workspace 写权限，降低不必要的访问范围 |
-| 显式团队消息 | 任务、进度和结果都有明确接收方与成员 ID，同名成员也能可靠区分 |
+| Independent model per member | High-capability models for complex planning, and more suitable or cheaper models for coding, testing, commit messages, and similar tasks |
+| Independent Skills / MCP per member | One Agent no longer loads a large set of unrelated capabilities, which reduces tool-selection noise and prompt overhead |
+| Independent context per member | Execution details stay with the executing member, and the Leader only receives progress and results, which limits context growth in a single Agent |
+| Independent permissions per member | A review member can be read-only and a coding member gets only Workspace write access, reducing unnecessary access scope |
+| Explicit team messages | Tasks, progress, and results have a clear recipient and member ID, so members with the same name can still be told apart reliably |
 
-因此，一个团队可以由高能力 Leader、专业编码模型、低成本文档助手和只读审查助手共同组成，而不必让所有工作都经过同一个模型和同一套庞大配置。
+A team can therefore combine a high-capability Leader, a specialized coding model, a low-cost documentation Assistant, and a read-only review Assistant, instead of routing every piece of work through the same model and the same large configuration.
 
-### 典型配置示例
+### Typical Configuration Example
 
-| 成员 | 推荐模型分工 | 权限和能力 |
+| Member | Recommended model role | Permissions and capabilities |
 | --- | --- | --- |
-| GPT Leader | 需求理解、架构规划、任务拆解和结果验收 | 只加载团队管理与必要的审查能力 |
-| GLM 编码成员 | 编写代码、修改文件、运行测试 | Workspace 可写，加载编码 Skills 和开发 MCP |
-| DeepSeek Flash Commit 助手 | 读取 Git 变更并生成提交信息 | 只读，只需要 Git 分析相关工具 |
+| GPT Leader | Requirement understanding, architecture planning, task breakdown, and result acceptance | Loads only team management and the review capabilities it needs |
+| GLM coding member | Writing code, modifying files, running tests | Workspace writable, with coding Skills and development MCP loaded |
+| DeepSeek Flash Commit Assistant | Reading Git changes and generating commit messages | Read-only, needs only Git analysis tools |
 
-Leader 把编码任务交给 GLM，并只接收进度、测试结果和关键产出；验收后再把范围明确的 Commit 任务交给 DeepSeek Flash。这样既保留 GPT 在复杂决策上的优势，又避免所有步骤都使用同一个高成本模型。
+The Leader hands coding tasks to GLM and receives only progress, test results, and key output; after acceptance it hands a narrowly scoped Commit task to DeepSeek Flash. This keeps GPT's advantage on complex decisions without running every step through the same expensive model.
 
-## 从哪里开始
+## Where to Start
 
-| 你的目标 | 推荐文档 |
+| Your goal | Recommended document |
 | --- | --- |
-| 首次安装和启动插件 | [安装与启动](./installation.md) |
-| 创建 Leader、Coder 或其他角色 | [助手库](./assistants.md) |
-| 选择成员并创建团队 | [创建团队](./creating-teams.md) |
-| 使用多成员聊天和团队协作 | [工作台与协作](./workbench.md) |
-| 浏览文件、查看 Git 变更 | [Workspace 与 Git 变更](./workspace.md) |
-| 添加/移出成员、清空或解散团队 | [团队管理](./team-management.md) |
-| 安装失败、模型缺失或界面异常 | [故障排查](./troubleshooting.md) |
+| Install and start the plugin for the first time | [Installation and Startup](./installation.md) |
+| Create a Leader, a Coder, or another role | [Assistant Library](./assistants.md) |
+| Select members and create a team | [Creating Teams](./creating-teams.md) |
+| Use multi-member chat and team collaboration | [Workbench and Collaboration](./workbench.md) |
+| Browse files and view Git changes | [Workspace and Git Changes](./workspace.md) |
+| Add/remove members, clear contexts, or disband a team | [Team Management](./team-management.md) |
+| Installation failures, missing models, or UI problems | [Troubleshooting](./troubleshooting.md) |
 
-## 核心概念
+## Core Concepts
 
-### 助手
+### Assistant
 
-助手是可复用的角色模板，保存 Provider、模型、Agent Preset、默认权限、思考模式、Skills、MCP Servers 和助手规则。助手本身不运行，加入团队后才会创建独立成员实例。
+An Assistant is a reusable role template. It stores the Provider, model, Agent Preset, default permissions, reasoning mode, Skills, MCP Servers, and Assistant rules. An Assistant does not run by itself; a separate member instance is created only when it joins a team.
 
-### 团队成员
+### Team Member
 
-团队成员是助手在某个团队中的运行快照。即使多次选择同一个助手，也会得到不同的成员 ID、Session 和上下文。
+A team member is the runtime snapshot of an Assistant in a specific team. Selecting the same Assistant several times still produces different member IDs, Sessions, and contexts.
 
 ### Leader
 
-每个团队必须有且只有一个 Leader。Leader 负责理解目标、拆解任务、分派成员、接收状态和验收结果。Leader 不是其他成员的父 Agent，所有成员仍然是平级、独立 Agent。
+Every team must have exactly one Leader. The Leader understands the goal, breaks down tasks, assigns members, receives status, and accepts results. The Leader is not the parent Agent of the other members; all members remain peer-level, independent Agents.
 
 ### Workspace
 
-团队所有成员共享同一个 Workspace，因此可以读取或修改同一批文件。每位成员是否可以修改文件，由该成员当前 Session 的权限决定。
+All team members share the same Workspace, so they can read and modify the same files. Whether a member may modify files is decided by the permissions of that member's current Session.
 
-## 推荐使用流程
+## Recommended Workflow
 
-1. 在 Harness 中配置需要使用的 Provider、模型和凭据。
-2. 进入 **设置 → Agent 团队** 创建至少一个 Leader 和一个普通成员助手。
-3. 点击悬浮 **团队** 按钮进入工作台，再点击团队列表顶部的 `+`，选择成员、Leader 和 Workspace。
-4. 创建团队后，在自动打开的工作台中向 Leader 描述完整目标。
-5. 观察 Leader 分派任务、成员执行、状态回报和最终验收。
-6. 需要时直接向某个成员补充要求，或在团队管理中调整成员。
+1. Configure the Providers, models, and credentials you need in Harness.
+2. Open **Settings → Agent Team** and create at least one Leader Assistant and one regular member Assistant.
+3. Click the floating **Team** button to enter the Workbench, then click `+` at the top of the team list to choose members, the Leader, and the Workspace.
+4. After the team is created, describe the complete goal to the Leader in the Workbench that opens automatically.
+5. Watch the Leader assign tasks, the members execute them, the status reports come back, and the final acceptance.
+6. When needed, send extra requirements directly to one member, or adjust members in Team Management.
 
-## 数据与安全边界
+## Data and Security Boundaries
 
-- Provider API Key 和 MCP 凭据由 Harness Profile 管理，Agent Team 不保存这些凭据。
-- 助手模板中的权限只是成员首次启动时的默认值，可在工作台中按成员调整。
-- 解散团队不会删除助手模板或 Workspace 文件。
-- 清空上下文或解散团队后，旧 Session 不再被插件恢复或使用；Harness 底层日志仍可能保留。
+- Provider API keys and MCP credentials are managed by the Harness Profile; Agent Team does not store them.
+- The permissions in an Assistant template are only the defaults used the first time a member starts; adjust them per member in the Workbench.
+- Disbanding a team does not delete Assistant templates or Workspace files.
+- After clearing contexts or disbanding a team, the plugin no longer restores or uses the old Sessions; Harness may still keep the underlying logs.
 
-## 获取帮助
+## Getting Help
 
-如文档未能解决问题，请在 [GitHub Issues](https://github.com/limuyang2/agent-team/issues) 提交反馈，并附上：
+If the documentation does not solve your problem, submit feedback on [GitHub Issues](https://github.com/limuyang2/agent-team/issues) and include:
 
-- DeepSeek Harness 版本。
-- Agent Team 版本。
-- 操作步骤和错误提示。
-- 必要的界面截图（请先遮盖 API Key、Token 和私人路径）。
+- The DeepSeek Harness version.
+- The Agent Team version.
+- The steps you performed and the error message.
+- Interface screenshots where needed (mask API keys, tokens, and private paths first).

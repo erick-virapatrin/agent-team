@@ -1,103 +1,103 @@
-# 安装与启动
+# Installation and Startup
 
-[文档首页](./README.md) · [下一篇：助手库](./assistants.md)
+[Documentation Home](./README.md) · [Next: Assistant Library](./assistants.md)
 
-## 环境要求
+## Requirements
 
-- Node.js `22.19.0+` 或 `24.0.0+`
+- Node.js `22.19.0+` or `24.0.0+`
 - DeepSeek Harness `0.1.1-rc.2`
 - Agent Team `0.1.2`
-- `pnpm` 已加入终端 `PATH`
+- `pnpm` added to your terminal `PATH`
 
-检查版本：
+Check the versions:
 
 ```bash
 node --version
 pnpm --version
 ```
 
-如果没有 pnpm：
+If you do not have pnpm:
 
 ```bash
 npm install -g pnpm
 ```
 
-## 从 npm 安装
+## Install from npm
 
-在任意目录执行：
+Run this from any directory:
 
 ```bash
 npx @deepseek-ai/dsh plugin --profile web add @limuyang2/dsh-agent-team
 ```
 
-Harness 会把插件加入 `web` Profile。安装完成后启动：
+Harness adds the plugin to the `web` Profile. Once the installation is complete, start it:
 
 ```bash
 npx @deepseek-ai/dsh web
 ```
 
-终端通常会输出：
+The terminal usually prints:
 
 ```text
 dsh web: http://127.0.0.1:3080
 ```
 
-在浏览器打开该地址即可。
+Open that address in your browser.
 
-## 使用官方 npm Registry
+## Using the Official npm Registry
 
-如果 `npm login` 或安装命令显示了第三方镜像地址，可以把用户级 Registry 改回 npm 官方地址：
+If `npm login` or the install command shows a third-party mirror address, switch the user-level registry back to the official npm address:
 
 ```bash
 npm config set registry=https://registry.npmjs.org/ --location=user
 npm config get registry
 ```
 
-第二条命令应输出：
+The second command should output:
 
 ```text
 https://registry.npmjs.org/
 ```
 
-## 从本地压缩包安装
+## Install from a Local Archive
 
-拿到 `.tgz` 文件后，在文件所在目录执行：
+Once you have the `.tgz` file, run this in the directory that contains it:
 
 ```bash
 npx @deepseek-ai/dsh plugin --profile web add ./limuyang2-dsh-agent-team-0.1.2.tgz
 ```
 
-文件名中的版本号可能不同，请按实际文件名替换。
+The version number in the file name may differ; replace it with your actual file name.
 
-## 确认安装成功
+## Verify the Installation
 
-启动 Harness 后检查两个入口：
+After starting Harness, check both entry points:
 
-1. 页面左侧出现用于打开工作台的悬浮 **团队** 按钮；按钮可拖动并会记住位置。
-2. **设置 → Agent 团队** 中出现助手库。
+1. The floating **Team** button that opens the Workbench appears on the left side of the page; the button is draggable and remembers its position.
+2. The assistant library appears under **Settings → Agent Team**.
 
-## 安装或更新后重启
+## Restart After Installing or Updating
 
-如果 Harness 已经运行，请先在原终端按 `Ctrl+C` 停止，再重新执行：
+If Harness is already running, press `Ctrl+C` in the original terminal to stop it, then run this again:
 
 ```bash
 npx @deepseek-ai/dsh web
 ```
 
-浏览器页面没有更新时，再刷新页面。插件不依赖修改 Harness 源码。
+If the browser page has not updated, reload the page. The plugin does not depend on modifying Harness source code.
 
-## 卸载插件
+## Uninstall the Plugin
 
-如果 Harness 正在运行，先在原终端按 `Ctrl+C` 停止服务，然后执行：
+If Harness is running, press `Ctrl+C` in the original terminal to stop the service, then run:
 
 ```bash
 npx @deepseek-ai/dsh plugin --profile web remove @limuyang2/dsh-agent-team
 ```
 
-该命令会从 `web` Profile 中移除插件依赖及其配置层。命令完成后重新启动 Harness，侧边栏和设置中的 Agent Team 入口将不再加载。
+This command removes the plugin dependency and its configuration layer from the `web` Profile. Restart Harness once the command completes; the Agent Team entries in the sidebar and in Settings will no longer load.
 
-卸载插件不会修改 DeepSeek Harness 源码，也不会删除团队 Workspace 中的文件。插件自身保存的助手模板、团队记录和 Session 引用是否继续保留，取决于 Harness Profile 数据目录是否仍存在；如需彻底清理这些数据，请先备份并自行处理对应 Profile 数据目录。
+Uninstalling the plugin does not modify DeepSeek Harness source code and does not delete files in team Workspaces. Whether the assistant templates, team records, and Session references stored by the plugin itself survive depends on whether the Harness Profile data directory is still present; to clean that data up completely, take a backup first and handle the matching Profile data directory yourself.
 
-## 下一步
+## Next Steps
 
-继续阅读 [助手库](./assistants.md)，创建第一个 Leader 和成员助手。
+Keep reading the [Assistant Library](./assistants.md) to create your first Leader and member assistants.
