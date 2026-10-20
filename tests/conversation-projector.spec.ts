@@ -90,10 +90,10 @@ describe('projectConversation', () => {
     const streams = new AssistantStreamTracker()
     streams.observe('session-1', frameStart(2, 1))
     streams.observe('session-1', frameChunk(2_000, {
-      type: 'block-end', index: 0, block: { type: 'reasoning', text: '完整思考' },
+      type: 'block-end', index: 0, block: { type: 'reasoning', text: 'full reasoning' },
     }))
     streams.observe('session-1', frameChunk(2_100, {
-      type: 'block-end', index: 1, block: { type: 'text', text: '完整回复' },
+      type: 'block-end', index: 1, block: { type: 'text', text: 'full reply' },
     }))
 
     const projected = projectConversation([], 240, undefined, streams.list('session-1'))
@@ -101,8 +101,8 @@ describe('projectConversation', () => {
     expect(projected.nodes).toEqual([
       expect.objectContaining({
         kind: 'assistant',
-        text: '完整回复',
-        reasoning: '完整思考',
+        text: 'full reply',
+        reasoning: 'full reasoning',
         streaming: true,
       }),
     ])
@@ -170,13 +170,13 @@ describe('projectConversation', () => {
           role: 'assistant',
           source: { kind: 'model', provider: 'deepseek', model: 'deepseek-chat' },
           content: [
-            { type: 'reasoning', text: '分析完成' },
-            { type: 'text', text: '最终回答' },
+            { type: 'reasoning', text: 'analysis done' },
+            { type: 'text', text: 'final answer' },
           ],
         },
         stream: [
-          { type: 'reasoning-chunks', time0: 1_000, index: 0, dt: [200, 100], texts: ['分析', '完成'] },
-          { type: 'text-chunks', time0: 3_400, index: 1, dt: [100], texts: ['最终回答'] },
+          { type: 'reasoning-chunks', time0: 1_000, index: 0, dt: [200, 100], texts: ['analysis', ' done'] },
+          { type: 'text-chunks', time0: 3_400, index: 1, dt: [100], texts: ['final answer'] },
         ],
       }),
     ])
@@ -184,7 +184,7 @@ describe('projectConversation', () => {
     expect(projected.nodes).toEqual([
       expect.objectContaining({
         kind: 'assistant',
-        reasoning: '分析完成',
+        reasoning: 'analysis done',
         reasoningStartedAt: 1_000,
         reasoningCompletedAt: 3_400,
       }),
@@ -208,33 +208,33 @@ describe('projectConversation', () => {
       }),
       event(2, 'user/message', {
         id: 'user-1', role: 'user', source: { kind: 'user' },
-        content: [{ type: 'text', text: '你好' }],
+        content: [{ type: 'text', text: 'hello' }],
       }),
       event(3, 'user/message', {
         id: 'relay-1', role: 'user',
         source: { kind: 'agent-team', plugin: 'dsh-agent-team', form: 'relay' },
-        content: [{ type: 'text', text: 'Leader 分配的任务' }],
+        content: [{ type: 'text', text: 'task assigned by the Leader' }],
       }),
       event(4, 'user/message', {
         id: 'legacy-relay', role: 'user',
         source: { kind: 'plugin', plugin: 'dsh-agent-team', form: 'relay' },
-        content: [{ type: 'text', text: '旧版持久化转发的任务' }],
+        content: [{ type: 'text', text: 'task forwarded by legacy persistence' }],
       }),
       event(5, 'user/message', {
         id: 'foreign-relay', role: 'user',
         source: { kind: 'plugin', plugin: 'another-plugin', form: 'relay' },
-        content: [{ type: 'text', text: '其他插件的内部转发' }],
+        content: [{ type: 'text', text: 'internal forward from another plugin' }],
       }),
     ])
 
     expect(projected.nodes).toEqual([
-      expect.objectContaining({ kind: 'user', text: '你好' }),
-      expect.objectContaining({ kind: 'user', text: 'Leader 分配的任务' }),
-      expect.objectContaining({ kind: 'user', text: '旧版持久化转发的任务' }),
+      expect.objectContaining({ kind: 'user', text: 'hello' }),
+      expect.objectContaining({ kind: 'user', text: 'task assigned by the Leader' }),
+      expect.objectContaining({ kind: 'user', text: 'task forwarded by legacy persistence' }),
     ])
     expect(JSON.stringify(projected.nodes)).not.toContain('Current runtime context')
     expect(JSON.stringify(projected.nodes)).not.toContain('available_skills')
-    expect(JSON.stringify(projected.nodes)).not.toContain('其他插件的内部转发')
+    expect(JSON.stringify(projected.nodes)).not.toContain('internal forward from another plugin')
   })
 
   it('projects persisted member relays as structured compact team messages', () => {
