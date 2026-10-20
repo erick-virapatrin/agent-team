@@ -3,4 +3,6 @@ lib/
 coverage/
 .DS_Store
 *.log
+.scratch
+.dsh-notes.md
 
