@@ -94,9 +94,9 @@ export function ConversationColumn({
   const visibleNodes = mergeConversationNodes(conversation?.nodes ?? [], pendingMessages)
   const pendingInteractions = conversation?.pendingInteractions ?? []
   const statusLabel = pendingInteractions.some(interaction => interaction.kind === 'approval')
-    ? '等待审批'
+    ? 'Awaiting approval'
     : pendingInteractions.length > 0
-      ? '等待回答'
+      ? 'Awaiting answer'
       : memberStatusLabel(conversation?.status ?? member.lastRuntimeState)
   const modelCapabilities = useModelCapabilities(
     member.assistantSnapshot.provider,
@@ -107,7 +107,7 @@ export function ConversationColumn({
     ? reasoningEffortLabel(modelCapabilities.value, reasoningEffort)
     : defaultReasoningEffort
       ? reasoningEffortLabel(modelCapabilities.value, defaultReasoningEffort)
-      : '默认'
+      : 'Default'
   const skillNamesKey = member.assistantSnapshot.skillAllowlist.join('\u0000')
   const composerMenuId = `agent-team-composer-menu-${member.id}`
 
@@ -186,7 +186,7 @@ export function ConversationColumn({
         setComposerCandidates(entries.map(entry => ({
           id: `file:${entry.path}`,
           label: entry.path,
-          description: 'Workspace 文件',
+          description: 'Workspace file',
           replacement: workspaceFileMention(entry.path),
         })))
         setComposerCandidatesLoading(false)
@@ -361,13 +361,13 @@ export function ConversationColumn({
   return (
     <section
       className={`${css.conversationColumn} ${expanded ? css.conversationColumnExpanded : ''}`}
-      aria-label={`${member.displayName} 对话`}
+      aria-label={`${member.displayName} conversation`}
       role={expanded ? 'dialog' : undefined}
       aria-modal={expanded || undefined}
     >
       <header
         className={css.columnHeader}
-        title={expanded ? undefined : '双击放大对话'}
+        title={expanded ? undefined : 'Double-click to expand conversation'}
         onDoubleClick={() => { if (!expanded) onExpandedChange(true) }}
       >
         <div className={css.columnIdentity}>
@@ -376,7 +376,7 @@ export function ConversationColumn({
             <strong>{member.displayName} {member.role === 'leader' && <CrownIcon size={15} className={css.leaderCrown} title="Leader" />}</strong>
             <div
               className={css.columnModelMeta}
-              title={`${member.assistantSnapshot.provider} / ${member.assistantSnapshot.model} · 思考模式：${reasoningModeLabel}`}
+              title={`${member.assistantSnapshot.provider} / ${member.assistantSnapshot.model} · Reasoning mode: ${reasoningModeLabel}`}
             >
               <span className={css.columnModelName}>
                 {member.assistantSnapshot.provider} / {member.assistantSnapshot.model}
@@ -388,11 +388,11 @@ export function ConversationColumn({
         <div className={css.columnHeaderActions}>
           <span className={css.columnStatus}>{statusLabel}</span>
           {expanded && (
-            <Tooltip label="关闭放大对话" side="bottom" delayMs={400}>
+            <Tooltip label="Close expanded view" side="bottom" delayMs={400}>
               <button
                 type="button"
                 className={css.columnExpandClose}
-                aria-label="关闭放大对话"
+                aria-label="Close expanded view"
                 onDoubleClick={event => { event.stopPropagation() }}
                 onClick={() => { onExpandedChange(false) }}
               >
@@ -414,7 +414,7 @@ export function ConversationColumn({
           ? <div className={css.columnEmpty}>
             <span className={css.emptyAvatar}>{member.displayName.slice(0, 1).toUpperCase()}</span>
             <strong>{member.displayName}</strong>
-            <span>{member.role === 'leader' ? '向 Leader 描述目标，由它组织团队协作。' : '等待 Leader 分配任务，或直接向该成员发送消息。'}</span>
+            <span>{member.role === 'leader' ? 'Describe the goal to the Leader, which coordinates the team.' : 'Waiting for the Leader to assign a task, or message this member directly.'}</span>
           </div>
           : <>
             {visibleNodes.map(node => <ConversationNodeView key={node.id} node={node} />)}
@@ -441,11 +441,11 @@ export function ConversationColumn({
             id={composerMenuId}
             className={css.composerTriggerMenu}
             role="listbox"
-            aria-label={composerTrigger.kind === 'skill' ? 'Skill 候选' : 'Workspace 文件候选'}
+            aria-label={composerTrigger.kind === 'skill' ? 'Skill suggestions' : 'Workspace file suggestions'}
           >
             <div className={css.composerTriggerHeading}>
-              <strong>{composerTrigger.kind === 'skill' ? 'Skills' : 'Workspace 文件'}</strong>
-              <span>↑↓ 选择 · Enter 插入 · Esc 关闭</span>
+              <strong>{composerTrigger.kind === 'skill' ? 'Skills' : 'Workspace files'}</strong>
+              <span>↑↓ Select · Enter Insert · Esc Close</span>
             </div>
             <div ref={composerTriggerOptionsRef} className={css.composerTriggerOptions}>
               {composerCandidates.map((candidate, index) => (
@@ -464,15 +464,15 @@ export function ConversationColumn({
                   <span>{candidate.description}</span>
                 </button>
               ))}
-              {composerCandidatesLoading && <span className={css.composerTriggerEmpty}>正在搜索…</span>}
+              {composerCandidatesLoading && <span className={css.composerTriggerEmpty}>Searching…</span>}
               {!composerCandidatesLoading && composerCandidatesError !== undefined && (
                 <span className={css.composerTriggerEmpty}>{composerCandidatesError}</span>
               )}
               {!composerCandidatesLoading && composerCandidatesError === undefined && composerCandidates.length === 0 && (
                 <span className={css.composerTriggerEmpty}>
                   {composerTrigger.kind === 'skill'
-                    ? '当前成员没有匹配的已加载 Skill'
-                    : '没有匹配的 Workspace 文件'}
+                    ? 'This member has no matching loaded Skills'
+                    : 'No matching Workspace files'}
                 </span>
               )}
             </div>
@@ -526,7 +526,7 @@ export function ConversationColumn({
             event.currentTarget.form?.requestSubmit()
           }}
           disabled={!canChat || uploadingFiles}
-          placeholder={!canChat ? '当前不可直接对话' : `发送消息到 ${member.displayName}…`}
+          placeholder={!canChat ? 'Direct chat unavailable' : `Send a message to ${member.displayName}…`}
           aria-controls={composerTrigger === undefined ? undefined : composerMenuId}
           aria-expanded={composerTrigger !== undefined}
           aria-activedescendant={composerTrigger !== undefined && composerCandidates.length > 0
@@ -540,7 +540,7 @@ export function ConversationColumn({
               type="button"
               className={`${css.composerIconButton} ${css.composerAttachButton}`}
               disabled={!canChat || uploadingFiles}
-              aria-label={uploadingFiles ? '正在上传文件' : '选择文件'}
+              aria-label={uploadingFiles ? 'Uploading files' : 'Choose files'}
               onClick={() => {
                 const textarea = textareaRef.current
                 fileInsertionPoint.current = {
@@ -562,14 +562,14 @@ export function ConversationColumn({
             />
             <select
               className={css.permissionSelect}
-              aria-label={`${member.displayName} 权限`}
+              aria-label={`${member.displayName} permissions`}
               value={permissionPresetId}
               disabled={changingPermission || permissionPresets.length === 0}
               onChange={event => { void changePermission(event.target.value) }}
             >
               {permissionPresets.map(permission => (
                 <option key={permission.value} value={permission.value}>
-                  权限 · {PERMISSION_LABELS[permission.value] ?? permission.name}
+                  Permissions · {PERMISSION_LABELS[permission.value] ?? permission.name}
                 </option>
               ))}
             </select>
@@ -577,11 +577,11 @@ export function ConversationColumn({
               && modelCapabilities.value.reasoning.efforts.length > 0 && (
                 <label
                   className={`${css.reasoningModeControl} ${changingReasoning ? css.reasoningModeControlDisabled : ''}`}
-                  title={`思考模式：${reasoningModeLabel}；切换后下一轮生效`}
+                  title={`Reasoning mode: ${reasoningModeLabel}; applies from the next turn`}
                 >
-                  <span>思考模式</span>
+                  <span>Reasoning mode</span>
                   <select
-                    aria-label={`${member.displayName} 思考模式；当前为 ${reasoningModeLabel}；切换后下一轮生效`}
+                    aria-label={`${member.displayName} reasoning mode; currently ${reasoningModeLabel}; applies from the next turn`}
                     value={reasoningEffort}
                     disabled={changingReasoning}
                     onChange={event => { void changeReasoning(event.target.value) }}
@@ -602,24 +602,24 @@ export function ConversationColumn({
               <ContextUsageMeter usage={conversation.contextUsage} />
             )}
             {running && (
-              <Tooltip label={stopping ? '停止中…' : '停止生成'} side="top" delayMs={400}>
+              <Tooltip label={stopping ? 'Stopping…' : 'Stop generating'} side="top" delayMs={400}>
                 <button
                   type="button"
                   className={css.composerIconButton}
                   disabled={stopping}
-                  aria-label={stopping ? '停止中' : '停止生成'}
+                  aria-label={stopping ? 'Stopping' : 'Stop generating'}
                   onClick={() => { void stop() }}
                 >
                   <IconStopFillRegular size={16} />
                 </button>
               </Tooltip>
             )}
-            <Tooltip label={sending ? '发送中…' : '发送消息'} side="top" delayMs={400}>
+            <Tooltip label={sending ? 'Sending…' : 'Send message'} side="top" delayMs={400}>
               <button
                 type="submit"
                 className={css.composerIconButton}
                 disabled={!canChat || sending || uploadingFiles || !content.trim()}
-                aria-label={sending ? '发送中' : '发送消息'}
+                aria-label={sending ? 'Sending' : 'Send message'}
               >
                 <IconSendOutlineRegular size={16} />
               </button>
@@ -638,17 +638,17 @@ function AssistantSkillsInfo({ skills }: { skills: readonly string[] }): JSX.Ele
       <button
         type="button"
         className={css.skillsInfoButton}
-        aria-label={skills.length === 0 ? '当前助手未加载 Skills' : `查看当前助手加载的 ${skills.length} 个 Skills`}
+        aria-label={skills.length === 0 ? 'This assistant has no Skills loaded' : `View the ${skills.length} Skills loaded by this assistant`}
       >
         <InfoIcon size={16} />
       </button>
       <div className={css.skillsInfoPopover} role="tooltip">
         <div className={css.skillsInfoHeading}>
-          <strong>已加载 Skills</strong>
-          <span>{skills.length} 个</span>
+          <strong>Loaded Skills</strong>
+          <span>{skills.length}</span>
         </div>
         {skills.length === 0
-          ? <span className={css.skillsInfoEmpty}>当前助手未加载 Skill</span>
+          ? <span className={css.skillsInfoEmpty}>No Skills loaded for this assistant</span>
           : (
             <ul className={css.skillsInfoList}>
               {skills.map(skill => <li key={skill}>{skill}</li>)}
@@ -686,11 +686,11 @@ function ContextUsageMeter({
     ? 0
     : Math.round(usage.cacheReadTokens / usage.inputTokens * 100)
   const details = [
-    `输入 ${formatTokenCount(usage.inputTokens)}`,
-    `输出 ${formatTokenCount(usage.outputTokens)}`,
-    `缓存命中 ${cacheHitPercent}%`,
-    ...(usage.cacheWriteTokens > 0 ? [`缓存写 ${formatTokenCount(usage.cacheWriteTokens)}`] : []),
-    ...(usage.reasoningTokens > 0 ? [`思考 ${formatTokenCount(usage.reasoningTokens)}`] : []),
+    `Input ${formatTokenCount(usage.inputTokens)}`,
+    `Output ${formatTokenCount(usage.outputTokens)}`,
+    `Cache hit ${cacheHitPercent}%`,
+    ...(usage.cacheWriteTokens > 0 ? [`Cache write ${formatTokenCount(usage.cacheWriteTokens)}`] : []),
+    ...(usage.reasoningTokens > 0 ? [`Reasoning ${formatTokenCount(usage.reasoningTokens)}`] : []),
   ]
   return (
     <div className={`${css.contextUsage} ${pressureClass}`}>
@@ -698,8 +698,8 @@ function ContextUsageMeter({
         type="button"
         className={css.contextUsageButton}
         aria-label={percent === undefined
-          ? `已使用约 ${usage.usedTokens} tokens，上下文窗口大小未知`
-          : `上下文已使用约 ${usage.usedTokens} / ${usage.contextWindow} tokens，${percent}%`}
+          ? `About ${usage.usedTokens} tokens used, context window size unknown`
+          : `Context uses about ${usage.usedTokens} / ${usage.contextWindow} tokens, ${percent}%`}
       >
         <svg className={css.contextUsageRing} viewBox="0 0 36 36" aria-hidden="true">
           <circle className={css.contextUsageRingTrack} cx="18" cy="18" r="14" />
@@ -716,11 +716,11 @@ function ContextUsageMeter({
         </svg>
       </button>
       <div className={css.contextUsagePopover} role="tooltip">
-        <strong>已使用 {formatTokenCount(usage.usedTokens)} tokens</strong>
+        <strong>Used {formatTokenCount(usage.usedTokens)} tokens</strong>
         <span>
           {usage.contextWindow === undefined
-            ? '上下文窗口大小未知'
-            : `上下文窗口 ${formatTokenCount(usage.contextWindow)} · 已用 ${percent}%`}
+            ? 'Context window size unknown'
+            : `Context window ${formatTokenCount(usage.contextWindow)} · ${percent}% used`}
         </span>
         <span>{details.join(' · ')}</span>
       </div>
@@ -744,7 +744,7 @@ export function ConversationNodeView({ node }: { node: ConversationNode }): JSX.
             : projectUserText(node.text, [])}
         </div>
       )}
-      {node.streaming && <span className={css.streamingMark}>生成中…</span>}
+      {node.streaming && <span className={css.streamingMark}>Generating…</span>}
     </article>
   )
 }
@@ -772,8 +772,8 @@ function ReasoningBlock({
   const timing = elapsed === undefined
     ? undefined
     : reasoningRunning
-      ? `思考中 · ${formatElapsedTime(elapsed)}`
-      : `用时 ${formatElapsedTime(elapsed)}`
+      ? `Thinking · ${formatElapsedTime(elapsed)}`
+      : `Took ${formatElapsedTime(elapsed)}`
 
   return (
     <details className={css.reasoningBlock}>
@@ -793,19 +793,19 @@ function ReasoningBlock({
 }
 
 function formatElapsedTime(milliseconds: number): string {
-  if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(1)} 秒`
+  if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(1)}s`
   const minutes = Math.floor(milliseconds / 60_000)
   const seconds = Math.floor((milliseconds % 60_000) / 1_000)
-  return `${minutes} 分 ${seconds} 秒`
+  return `${minutes}m ${seconds}s`
 }
 
 const TEAM_MESSAGE_TYPE_LABELS: Record<Extract<ConversationNode, { kind: 'team-message' }>['messageType'], string> = {
-  instruction: '指令',
-  progress: '进度',
-  result: '结果',
-  question: '问题',
-  warning: '警告',
-  system: '系统',
+  instruction: 'Instruction',
+  progress: 'Progress',
+  result: 'Result',
+  question: 'Question',
+  warning: 'Warning',
+  system: 'System',
 }
 
 function TeamMessageCard({ node }: { node: Extract<ConversationNode, { kind: 'team-message' }> }): JSX.Element {
@@ -821,10 +821,10 @@ function TeamMessageCard({ node }: { node: Extract<ConversationNode, { kind: 'te
             ? css.teamMessageSystem
             : css.teamMessageProgress
   const category = node.senderRole === 'leader'
-    ? 'Leader 消息'
+    ? 'Leader message'
     : node.senderRole === 'system'
-      ? '团队事件'
-      : '成员反馈'
+      ? 'Team event'
+      : 'Member feedback'
   return (
     <article className={`${css.teamMessageCard} ${toneClass}`}>
       <header className={css.teamMessageHeader}>
@@ -832,7 +832,7 @@ function TeamMessageCard({ node }: { node: Extract<ConversationNode, { kind: 'te
           <strong>{category}</strong>
           {node.senderRole !== 'system' && <span>{node.senderName}</span>}
           {node.senderRole !== 'system' && (
-            <code className={css.teamMessageMemberId} title={`成员 ID：${node.senderId}`}>
+            <code className={css.teamMessageMemberId} title={`Member ID: ${node.senderId}`}>
               ID {shortMemberId(node.senderId)}
             </code>
           )}
@@ -849,7 +849,7 @@ function shortMemberId(id: string): string {
 }
 
 function ToolCard({ node }: { node: Extract<ConversationNode, { kind: 'tool' }> }): JSX.Element {
-  const status = node.status === 'running' ? '执行中' : node.status === 'success' ? '已完成' : '失败'
+  const status = node.status === 'running' ? 'Running' : node.status === 'success' ? 'Completed' : 'Failed'
   return (
     <details className={`${css.toolCard} ${node.status === 'error' ? css.toolCardError : ''}`} open={node.status !== 'success'}>
       <summary>
@@ -857,8 +857,8 @@ function ToolCard({ node }: { node: Extract<ConversationNode, { kind: 'tool' }> 
         <strong>{node.name}</strong>
         <span>{status}</span>
       </summary>
-      {node.arguments && <div className={css.toolSection}><span>参数</span><pre>{prettyJson(node.arguments)}</pre></div>}
-      {node.result && <div className={css.toolSection}><span>结果</span><pre>{node.result}</pre></div>}
+      {node.arguments && <div className={css.toolSection}><span>Arguments</span><pre>{prettyJson(node.arguments)}</pre></div>}
+      {node.result && <div className={css.toolSection}><span>Result</span><pre>{node.result}</pre></div>}
       {node.error && <div className={css.toolError}>{node.error}</div>}
     </details>
   )

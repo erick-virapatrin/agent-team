@@ -179,7 +179,7 @@ export class TeamRuntime {
     if (member === undefined) throw new AgentTeamError('MEMBER_NOT_FOUND', `Unknown member '${slotId}'`)
     const owned = this.owned.get(member.sessionId)
     if (owned === undefined || owned.teamId !== teamId || owned.slotId !== slotId) {
-      throw new AgentTeamError('INTERACTION_NOT_FOUND', '该交互请求不属于指定的团队成员')
+      throw new AgentTeamError('INTERACTION_NOT_FOUND', 'This interaction request does not belong to the specified team member')
     }
     await this.interactions.respond(member.sessionId, interactionId, response)
   }
@@ -304,10 +304,10 @@ export class TeamRuntime {
           team: current,
           recipientSlotId: current.leaderSlotId,
           content: [
-            `新成员「${readyMember.displayName}」已加入团队。`,
-            `成员 ID：${readyMember.id}`,
-            `模型：${readyMember.assistantSnapshot.provider} / ${readyMember.assistantSnapshot.model}`,
-            '状态：已就绪，可以分配任务。',
+            `New member "${readyMember.displayName}" has joined the team.`,
+            `Member ID: ${readyMember.id}`,
+            `Model: ${readyMember.assistantSnapshot.provider} / ${readyMember.assistantSnapshot.model}`,
+            'Status: ready, tasks can be assigned.',
           ].join('\n'),
         })
         await this.service.updateRuntimeTeam(
@@ -366,7 +366,7 @@ export class TeamRuntime {
       const notice = systemTeamMessage({
         team,
         recipientSlotId: team.leaderSlotId,
-        content: `团队成员「${member.displayName}」（成员 ID：${member.id}）已被移出团队，其 Session 已停止并归档。后续任务请重新分配给其他成员。`,
+        content: `Team member "${member.displayName}" (member ID: ${member.id}) has been removed from the team; their Session has been stopped and archived. Reassign subsequent tasks to other members.`,
       })
       await this.service.updateRuntimeTeam(
         teamId,
@@ -568,7 +568,7 @@ export class TeamRuntime {
           ? error
           : new AgentTeamError(
             'TEAM_DELETE_FAILED',
-            `团队“${team.name}”解散失败：${message}`,
+            `Failed to disband team "${team.name}": ${message}`,
             { teamId, cause: message },
             { cause: error },
           )
@@ -958,7 +958,7 @@ export class TeamRuntime {
         ? error
         : new AgentTeamError(
           'SESSION_CREATE_FAILED',
-          `成员“${member.displayName}”启动失败：${causeMessage}`,
+          `Failed to start member "${member.displayName}": ${causeMessage}`,
           { memberId: member.id, cause: causeMessage },
           { cause: error },
         )
